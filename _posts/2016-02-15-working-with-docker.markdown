@@ -134,7 +134,7 @@ base/archlinux      latest              dce0559daa1b        10 months ago       
 внутри контейнера. Делается это следующей командой
 
 ```shell
-$ docker –it –entrypoint /bin/bash base/archlinux
+$ docker run –it –entrypoint /bin/bash base/archlinux
 ```
 
 Используемые флаги
