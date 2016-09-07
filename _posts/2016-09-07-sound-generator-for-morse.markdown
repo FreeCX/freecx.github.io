@@ -153,22 +153,22 @@ fn main() {
     let dot = generate(300.0, 0.15, 1.0);
     // и соответственно 'тире'
     let dash = generate(300.0, 0.45, 1.0);
-    // собираем 6615 (44100 * 0.15) нулей (u16 или по два для u8) для паузы между знаками
-    let e_pause = vec![0_u8; 2 * 6615];
-    // собираем 19845 (44100 * 0.45) нулей для паузы между словами
-    let w_pause = vec![0_u8; 2 * 19845];
+    // собираем 19845 (44100 * 0.45) нулей (u16 или по два для u8) для паузы между знаками
+    let e_pause = vec![0_u8; 2 * 19845];
+    // собираем 46305 (44100 * 1.05) нулей для паузы между словами
+    let w_pause = vec![0_u8; 2 * 46305];
     // кодируем наш текст
     let morse_text = encode("привет мир!");
     for code in morse_text.chars() {
         match code {
             '·' => result_audio.extend(dot.clone()),
             '-' => result_audio.extend(dash.clone()),
-            // пауза между символами
+            // пауза между словами
             ' ' => result_audio.extend(w_pause.clone()),
             _ => ()
         };
-        // пауза между словами
-        result_audio.extend(e_pause.clone());
+        // пауза между символами
+        result_audio.extend(w_pause.clone());
     }
 }
 ```
