@@ -164,11 +164,14 @@ fn main() {
             '·' => result_audio.extend(dot.clone()),
             '-' => result_audio.extend(dash.clone()),
             // пауза между словами
-            ' ' => result_audio.extend(w_pause.clone()),
-            _ => ()
+            ' ' => {
+                result_audio.extend(w_pause.clone());
+                continue
+            }
+            _ => {}
         };
         // пауза между символами
-        result_audio.extend(w_pause.clone());
+        result_audio.extend(e_pause.clone());
     }
 }
 ```
