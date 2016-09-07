@@ -81,7 +81,7 @@ fn encode(input: &str) -> String {
 Собственно код:
 
 ```rust
-fn generate(freq: f32, duration: f32, mut volume: f32) -> Vec<u8> {
+fn generate(freq: f32, duration: f32, volume: f32) -> Vec<u8> {
     // частота дискретизации
     let sample_rate = 44100;
     // амплитуда определяется максимальным значением для i16 умноженая на громкость
@@ -147,16 +147,18 @@ fn hi_lo(data: u16, order: Order) -> [u8; 2] {
 // весь предыдущий код
 
 fn main() {
+    // длительность звучания 'точки'
+    let dot_len = 0.15;
     // вектор для наших сэмплов
     let mut result_audio: Vec<u8> = Vec::new();
     // звук одной 'точки'
-    let dot = generate(300.0, 0.15, 1.0);
+    let dot = generate(300.0, dot_len, 1.0);
     // и соответственно 'тире'
-    let dash = generate(300.0, 0.45, 1.0);
-    // собираем 19845 (44100 * 0.45) нулей (u16 или по два для u8) для паузы между знаками
-    let e_pause = vec![0_u8; 2 * 19845];
-    // собираем 46305 (44100 * 1.05) нулей для паузы между словами
-    let w_pause = vec![0_u8; 2 * 46305];
+    let dash = generate(300.0, 3.0 * dot_len, 1.0);
+    // собираем 44100 * 3 * dot_len нулей (u16 или по два для u8) для паузы между знаками
+    let e_pause = vec![0_u8; 2 * (44100.0 * 3.0 * dot_len).round() as usize];
+    // собираем 44100 * 7 * dot_len нулей для паузы между словами
+    let w_pause = vec![0_u8; 2 * (44100.0 * 7.0 * dot_len).round() as usize];
     // кодируем наш текст
     let morse_text = encode("привет мир!");
     for code in morse_text.chars() {
