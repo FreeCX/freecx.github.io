@@ -117,7 +117,7 @@ span[data-note] {
   -webkit-animation-fill-mode: both;
   -webkit-animation-name: bounce;
   a {
-    background: #ddd url("gravatar_wrapper.png");
+    background: #ddd;
     color: #000;
     text-decoration: none;
     font-weight: 700;
@@ -139,6 +139,8 @@ span[data-note] {
       display: inline-block !important;
     }
     .gravatar {
+      width: 85px;
+      height: 85px;
       margin-top: 5px;
       -webkit-border-radius: 50%;
       -moz-border-radius: 50%;
