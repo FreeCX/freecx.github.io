@@ -74,7 +74,7 @@ fn encode(input: &str) -> String {
 
 Я же покажу всё в виде кода. Для генерации звука будем использовать синус. Нам понадобится только три параметра:
 
-* частота, Гц
+* частота, Герцы
 * продолжительность, секунды
 * громкость, значение в интервале [0, 1].
 
@@ -159,8 +159,11 @@ fn main() {
     let e_pause = vec![0_u8; 2 * (44100.0 * 3.0 * dot_len).round() as usize];
     // собираем 44100 * 7 * dot_len нулей для паузы между словами
     let w_pause = vec![0_u8; 2 * (44100.0 * 7.0 * dot_len).round() as usize];
+    // собираем 44100 * dot_len нулей для паузы между элементами одного знака
+    let s_pause = vec![0_u8; 2 * (44100.0 * dot_len).round() as usize];
     // кодируем наш текст
     let morse_text = encode("привет мир!");
+    let mut last_char = '?';
     for code in morse_text.chars() {
         match code {
             '·' => result_audio.extend(dot.clone()),
@@ -172,8 +175,14 @@ fn main() {
             }
             _ => {}
         };
-        // пауза между символами
-        result_audio.extend(e_pause.clone());
+        if last_char == code {
+            // пауза между элементами одного знака
+            result_audio.extend(s_pause.clone());
+        } else {
+            // пауза между символами
+            result_audio.extend(e_pause.clone());
+        }
+        last_char = code;
     }
 }
 ```
