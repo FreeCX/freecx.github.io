@@ -186,13 +186,13 @@ if __name__ == "__main__":
 Для создания своего контейнера создадим файл с конфигурацией -- *Dockerfile*, со следующим содержимым
 
 ```
-1 FROM base/archlinux
-2 MAINTAINER dr.FreeCX <email>
-3 RUN pacman -Sy && pacman -S python-flask python-pip --noconfirm
-4 WORKDIR /app
-5 EXPOSE 5000
-6 VOLUME ["/app"]
-7 CMD ["python", "/app/main.py"]
+FROM base/archlinux
+MAINTAINER dr.FreeCX <email>
+RUN pacman -Sy && pacman -S python-flask python-pip --noconfirm
+WORKDIR /app
+EXPOSE 5000
+VOLUME ["/app"]
+CMD ["python", "/app/main.py"]
 ```
 
 Рассмотрим файл построчно
