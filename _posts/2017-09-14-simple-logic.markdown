@@ -43,7 +43,7 @@ class ElementNAND:
 
     def execute(self):
         # X NAND Y = NOT (X AND Y) = (NOT X) or (NOT Y)
-        # см. правило ДеМоргана
+        # см. законы де Моргана
         self.output[0] = (not self.input[0]) % 2 or (not self.input[1]) % 2
         # и выбирай любое из условий :)
         # self.output[0] = (not (self.input[0] and self.input[1])) % 2
@@ -142,7 +142,7 @@ def execute(self):
     if self.type == 'NAND':
         """ наш прошлый код """
         # X NAND Y = NOT (X AND Y) = (NOT X) or (NOT Y)
-        # см. правило ДеМоргана
+        # см. законы де Моргана
         self.output[0] = (not self.input[0]) % 2 or (not self.input[1]) % 2
         # и выбирай любое из условий :)
         # self.output[0] = (not (self.input[0] and self.input[1])) % 2
@@ -249,7 +249,7 @@ class Element:
         # если элемент NAND, то считаем по формуле
         if self.type == 'NAND':
             # X NAND Y = NOT (X AND Y) = (NOT X) or (NOT Y)
-            # см. правило ДеМоргана
+            # см. законы де Моргана
             self.output[0] = (not self.input[0]) % 2 or (not self.input[1]) % 2
             # и выбирай любое из условий :)
             # self.output[0] = (not (self.input[0] and self.input[1])) % 2
@@ -594,7 +594,7 @@ class Element:
         # если элемент NAND, то считаем по формуле
         if self.type == 'NAND':
             # X NAND Y = NOT (X AND Y) = (NOT X) or (NOT Y)
-            # см. правило ДеМоргана
+            # см. законы де Моргана
             self.output[0] = (not self.input[0]) % 2 or (not self.input[1]) % 2
             # и выбирай любое из условий :)
             # self.output[0] = (not (self.input[0] and self.input[1])) % 2
