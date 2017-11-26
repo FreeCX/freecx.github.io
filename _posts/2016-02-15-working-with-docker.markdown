@@ -185,7 +185,7 @@ if __name__ == "__main__":
 
 Для создания своего контейнера создадим файл с конфигурацией -- *Dockerfile*, со следующим содержимым
 
-```
+```text
 FROM base/archlinux
 MAINTAINER dr.FreeCX <email>
 RUN pacman -Sy && pacman -S python-flask python-pip --noconfirm
@@ -197,14 +197,14 @@ CMD ["python", "/app/main.py"]
 
 Рассмотрим файл построчно
 
-* `FROM base/archlinux` -- указывает на каком образе основывать новый образ-контейнер
-* `MAINTAINER dr.FreeCX <email>` -- указывает автора или сопровождающего этого контейнера
-* `RUN pacman -Sy && pacman -S python-flask python-pip --noconfirm` -- запускает в контейнере обновление 
+* _FROM base/archlinux_ -- указывает на каком образе основывать новый образ-контейнер
+* _MAINTAINER dr.FreeCX <email>_ -- указывает автора или сопровождающего этого контейнера
+* _RUN pacman -Sy && pacman -S python-flask python-pip --noconfirm_ -- запускает в контейнере обновление 
 и установку пакетов
-* `WORKDIR /app` -- указывает на рабочую директорию данного контейнера
-* `EXPOSE 5000` -- устанавливаем открываемый порт
-* `VOLUME ["/app"]` -- указывает на подключаемый пользовательский том
-* `CMD ["python", "/app/main.py"]` -- отвечает за запуск команды в контейнере 
+* _WORKDIR /app_ -- указывает на рабочую директорию данного контейнера
+* _EXPOSE 5000_ -- устанавливаем открываемый порт
+* _VOLUME ["/app"]_ -- указывает на подключаемый пользовательский том
+* _CMD ["python", "/app/main.py"]_ -- отвечает за запуск команды в контейнере 
 (её можно переопределить используя флаг *--entrypoint* при запуске контейнера).
 
 На третьем шаге команды объединены в одну для того чтобы не создавать лишние коммиты в создаваемом 
@@ -221,7 +221,7 @@ $ docker build -t site-app .
 
 Если всё прошло удачно, то увидим следующее
 
-```
+```text
 Sending build context to Docker daemon 43.01 kB
 Sending build context to Docker daemon 
 Step 0 : FROM base/archlinux
@@ -283,6 +283,274 @@ $ docker stop 1d3b134e4095
 $ docker stop focused_swartz
 ```
 
+### Пара слов о Docker compose
+
+> Данный раздел находится в пассивном написани!
+
+Теперь когда мы немного разобрались с docker'ом, давайте рассмотрим более интересную штуку, такую как *Вocker Сompose*!
+
+Как говорит оффициальная документация
+
+> Compose is a tool for defining and running multi-container Docker applications.
+
+то есть это тулза с помощью которой можно собрать систему из нескольких связанных docker-контейнеров, что мы и сделаем!
+
+#### Что будем ваять?
+Давайте напишем web-приложение доску, где можно будет оставить комментарий. 
+
+Для этого нам понадобится несколько компонентов:
+- flask -- наш микрофреймворк
+- postgresql -- наша БД
+- nginx -- http-сервер
+
+Конечно можно обойтись без nginx, но почему бы и нет?!
+
+Структура нашего проекта будет следующей:
+
+```shell
+.
+├── docker-compose.yml
+├── .env
+├── nginx
+│   ├── Dockerfile
+│   └── sites-enabled
+│       └── flask_project
+└── web
+    ├── config.py
+    ├── create_db.py
+    ├── Dockerfile
+    ├── main.py
+    ├── requirements.txt
+    └── templates
+        └── index.html
+```
+
+Но начнём по порядку!
+
+#### Приложение
+`main.py`
+```python
+from flask import Flask, render_template, redirect, request
+from werkzeug.contrib.fixers import ProxyFix
+from flask_sqlalchemy import SQLAlchemy
+
+app = Flask(__name__)
+# загрузим конфиг из файла
+app.config.from_object('config')
+
+# нужно для корректной работы проброса через gunicorn и nginx
+app.wsgi_app = ProxyFix(app.wsgi_app)
+
+# создаём объект БД
+db = SQLAlchemy(app)
+
+
+# наша таблица в БД
+class Post(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user = db.Column(db.String(16), nullable=False)
+    text = db.Column(db.String(256))
+
+    def __init__(self, user, text='<empty post>'):
+        self.user = user
+        self.text = text
+
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    if request.method == 'GET':
+        # получаем все посты
+        posts = Post.query.all()
+        # рендерим страницу
+        return render_template('index.html', posts=posts)
+    elif request.method == 'POST':
+        # получаем данные со страницы
+        user, text = request.form['user-name'], request.form['user-text']
+        # создаём пост
+        new_post = Post(user, text)
+        # добавляем в БД
+        db.session.add(new_post)
+        db.session.commit()
+        # редиректим на страницу с GET
+        return redirect('/')
+    else:
+        # не будем поддерживать остальные методы
+        return 'Noooooooo!', 402
+
+
+if __name__ == '__main__':
+    app.run()
+```
+
+`config.py`
+```python
+from os import environ
+
+SECRET_KEY = environ['SECRET_KEY']
+DEBUG = environ['DEBUG']
+DB_NAME = environ['DB_NAME']
+DB_USER = environ['DB_USER']
+DB_PASS = environ['DB_PASS']
+DB_SERVICE = environ['DB_SERVICE']
+DB_PORT = environ['DB_PORT']
+SQLALCHEMY_DATABASE_URI = 'postgresql://{0}:{1}@{2}:{3}/{4}'.format(
+    DB_USER, DB_PASS, DB_SERVICE, DB_PORT, DB_NAME
+)
+```
+
+`create_db.py`
+```python
+from main import db
+
+
+db.create_all()
+db.session.commit()
+```
+
+`index.html`
+```html
+<!doctype html>
+<title>simply dashboard</title>
+<p>send a post</p>
+<form name='add-user' method='POST' action='/'>
+  <div class='user-name-input'>
+    user: <input name='user-name' class='user-name' type='text' size=16>
+    <input type='submit' value='send post'>
+  </div>
+  <div class='user-text-input'>
+    text:<br><textarea name='user-text' style='width: 300px; height: 100px;'></textarea>
+  </div>
+</form>
+<hr><p>Posts</p>
+<ul>
+  {% for post in posts %}
+    <li>
+      <div class='user' style='font-weight: bold;'>{{ post.user }}</div>
+      <div class='post'>{{ post.text }}</div>
+    </li>
+  {% endfor %}
+</ul>
+```
+
+`requirements.txt`
+```text
+flask==0.11.1
+flask_sqlalchemy==2.1
+gunicorn==19.6.0
+psycopg2==2.6.2
+```
+
+`Dockerfile`
+```text
+FROM python:3.4-onbuild
+```
+
+#### nginx
+`Dockerfile`
+```text
+FROM tutum/nginx
+RUN rm /etc/nginx/sites-enabled/default
+ADD sites-enabled/ /etc/nginx/sites-enabled
+```
+
+`flask_project`
+```text
+server {
+    listen 5000;
+    charset utf-8;
+
+    access_log  /var/log/nginx/access.log;
+    error_log  /var/log/nginx/error.log;
+
+    client_max_body_size 32m;
+
+    location / {
+        proxy_set_header X-Forward-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host $http_host;
+        proxy_redirect off;
+        if (!-f $request_filename) {
+            proxy_pass http://web:8000;
+            break;
+        }
+    }
+}
+```
+
+#### Конфиги Docker Compose
+`.env`
+```text
+DEBUG=True
+SECRET_KEY=its-my-super-secret-key-please-dont-forget-it
+DB_NAME=postgres
+DB_USER=postgres
+DB_PASS=postgres
+DB_SERVICE=postgres
+DB_PORT=5432
+```
+
+`docker-compose.yml`
+```yaml
+web:
+  restart: always
+  build: ./web
+  expose:
+    - "8000"
+  links:
+    - postgres:postgres
+  env_file: .env
+  command: /usr/local/bin/gunicorn -w 2 -b :8000 main:app # --log-file /tmp/gunicorn.log
+
+nginx:
+  restart: always
+  build: ./nginx/
+  ports:
+    - "5000:5000"
+  volumes:
+    - /www/static
+  volumes_from:
+    - web
+  links:
+    - web:web
+
+data:
+  restart: always
+  image: postgres:latest
+  volumes:
+    - /var/lib/postgresql
+  command: "true"
+
+postgres:
+  restart: always
+  image: postgres:latest
+  volumes_from:
+    - data
+  ports:
+    - "5432:5432"
+```
+
+#### Финал
+Собираем наши контейнеры
+```shell
+$ docker-compose build
+```
+
+Cоздаём таблицу в БД
+```shell
+$ docker-compose run web /usr/local/bin/python create_demo.py
+```
+
+И наконец поднимаем их
+```shell
+$ docker-compose up -d
+```
+
+Теперь можно открыть сам веб-сервис в браузере <localhost:5000>.
+
+Для остановки работы контейнеров выполните следующую команду в директории с проектом
+```bash
+$ docker-compose stop
+```
+
 Вот и всё на сегодня.
 
 ## Полезные ссылки
@@ -291,4 +559,8 @@ $ docker stop focused_swartz
 
 [2] [Docker Hub](https://registry.hub.docker.com/) -- хранилище **Docker** контейнеров.
 
-[3] [Flask](http://flask.pocoo.org/) -- микрофреймворком для создания вебсайтов на языке Python.
+[3] [Docker Compose](https://docs.docker.com/compose/) -- работа с мультиконтейнерами.
+
+[4] [Flask](http://flask.pocoo.org/) -- микрофреймворком для создания вебсайтов на языке Python.
+
+[5] [PostgreSQL](https://www.postgresql.org) -- свободная объектно-реляционная система управления базами данных.
