@@ -556,7 +556,7 @@ for x, y, z, s, c in table:
     assert(add_e.output == [s, c])
 ```
 
-Полная листинг представлен ниже
+Полный листинг представлен ниже
 
 ```python
 from itertools import product
