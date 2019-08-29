@@ -132,3 +132,7 @@ if __name__ == '__main__':
 [3] Документация по [PyAudio](https://people.csail.mit.edu/hubert/pyaudio/docs/)
 
 [4] Документация по [pygame](http://www.pygame.org/docs/)
+
+[5] [Программный синтез звука на ранних персональных компьютерах #1](https://habrahabr.ru/post/348036/)
+
+[6] [Программный синтез звука на ранних персональных компьютерах #2](https://habrahabr.ru/post/348192/)
