@@ -328,6 +328,10 @@ $ docker stop focused_swartz
 Но начнём по порядку!
 
 #### Приложение
+Приложение будет реализовывать две функции:
+- добавление данных в БД
+- и отображение
+
 `main.py`
 ```python
 from flask import Flask, render_template, redirect, request
@@ -346,9 +350,12 @@ db = SQLAlchemy(app)
 
 
 # наша таблица в БД
+# где у нас будет два поля с информацией
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    # пользователь
     user = db.Column(db.String(16), nullable=False)
+    # его текстовой пост
     text = db.Column(db.String(256))
 
     def __init__(self, user, text='<empty post>'):
@@ -361,7 +368,7 @@ def index():
     if request.method == 'GET':
         # получаем все посты
         posts = Post.query.all()
-        # рендерим страницу
+        # рендерим страницу с этими данными
         return render_template('index.html', posts=posts)
     elif request.method == 'POST':
         # получаем данные со страницы
@@ -544,12 +551,14 @@ $ docker-compose run web /usr/local/bin/python create_demo.py
 $ docker-compose up -d
 ```
 
-Теперь можно открыть сам веб-сервис в браузере <localhost:5000>.
+Теперь можно открыть сам веб-сервис в браузере <http://localhost:5000>.
 
 Для остановки работы контейнеров выполните следующую команду в директории с проектом
 ```bash
 $ docker-compose stop
 ```
+
+Исходный код всего проекта доступен в [репозитории](https://github.com/FreeCX/docker-compose-demo).
 
 Вот и всё на сегодня.
 
