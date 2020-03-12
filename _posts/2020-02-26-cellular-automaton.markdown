@@ -152,14 +152,13 @@ def __str__(self):
 ```
 
 # Результат
-Вот и всё, давайте насладимся результатом, если конечно видео будет воспроизводиться!
-<div class="video">
-   <video style="display:block; width:100%; height:auto;" autoplay controls loop="loop">
-       <source src="{{ site.baseurl }}/media/2020-02-26-cellular-automation/render.mp4" type="video/mp4"/>
-       <source src="{{ site.baseurl }}/media/2020-02-26-cellular-automation/render.ogv" type="video/ogg"/>
-       <source src="{{ site.baseurl }}/media/2020-02-26-cellular-automation/render.webm" type="video/webm"/>
-   </video>
-</div>
+Вот и всё, давайте насладимся результатом!
+<video class="video media" id="video-cleartightafricanwilddog" alt="cellular automaton GIF" autoplay="" playsinline="" preload="auto" poster="https://thumbs.gfycat.com/ClearTightAfricanwilddog-mobile.jpg" style="max-width: 500px; margin: 0px auto; display: block;" tabindex="-1" width="500" height="500">
+    <source src="https://thumbs.gfycat.com/ClearTightAfricanwilddog-mobile.mp4" type="video/mp4">
+    <source src="https://giant.gfycat.com/ClearTightAfricanwilddog.webm" type="video/webm">
+    <source src="https://giant.gfycat.com/ClearTightAfricanwilddog.mp4" type="video/mp4">
+    <source src="https://thumbs.gfycat.com/ClearTightAfricanwilddog-mobile.mp4" type="video/mp4">
+</video>
 
 # Заключение
 А на этом сегодня всё. Исходники на нескольких языках забирать [здесь](https://gist.github.com/FreeCX/d07e5cbf035bac095616de17e9046c8b).
