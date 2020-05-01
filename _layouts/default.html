@@ -17,7 +17,15 @@ layout: compress
 				<aside class="note"></aside>
 				<script async src="{{site.baseurl}}/assets/footnotes.js"></script>
 			{% endif %}
+		{% else %}
+			<div class="footer">
+				<span>Также читайте
+					<a href="https://antoniii.github.io/">antoniii</a>
+					<a href="https://citrux.github.io/">citrux</a>
+					<a href="https://sputnikas.github.io/">sputnikas</a>
+				</span>
+			</div>
+			<script>console.warn('А спонсор статей в моём блоге -- моя лень -- спонсор статей.');</script>
 		{% endif %}
-		<script>console.log('А спонсор статей в моём блоге -- моя лень -- спонсор статей.');</script>
 	</body>
 </html>
