@@ -317,7 +317,7 @@ section {
     margin: 0;
     padding: 0;
     li {
-      margin: 25px 0;
+      margin: 10px 0;
       .title {
         max-width: 100%;
         overflow: hidden !important;
@@ -382,4 +382,13 @@ section {
   100% {
     -webkit-transform: none;
   }
+}
+.footer {
+  position: fixed;
+  width: 100%;
+  left: 0;
+  bottom: 0;
+  background: #FFF;
+  padding: 10px 0 10px 0;
+  text-align: center;
 }
