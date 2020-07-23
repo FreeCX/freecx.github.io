@@ -1,0 +1,449 @@
+---
+title: Сказ о 2.5D эффекте
+layout: post
+---
+
+Совсем недавно просматривая старые фотки наткнулся на [две](https://github.com/FreeCX/vf-transtion/blob/master/demo/01.png) [интересные](https://github.com/FreeCX/vf-transtion/blob/master/demo/02.png) и появилась у меня идея сделать из них что-то типа параллакс эффекта, или как он там называется?
+
+Решил всё делать сам. Возможно просто было лень гуглить софт или видео о том, как этот эффект делается.
+
+За основу взял простую идею - прозрачность первой фотографии плавно уменьшается от 100% и до 0%, а у второй наоборот, от 0% до 100%.
+
+Поковырял немного фотошоп, но результат меня не устроил. Яркостная составляющая итогового результата в каждом кадре была разной.
+
+Недолго думая решил закодить своё.
+
+# Идея
+От идеи плавного варьирования прозрачности не будем отказываться, но возьмём за основу вот такую формулу:
+
+![image](https://wikimedia.org/api/rest_v1/media/math/render/svg/c9ade261edcf6ceb558a45aa8625197e863de0aa)
+
+Формула для преобразования есть, остаётся только написать код который смешивает фотографии в нужных пропорциях.
+
+Далее можно полученный набор изображений с помощью ffmpeg перегнать в видео.
+
+# 1-ый блин, python
+Сразу скажу что код не совсем тот, что был у первой реализации, но по скорости он был всё равно отстойный!
+
+Для начала создадим класс `ffmpeg`, который будет ответственен за работу с ним
+```python
+import subprocess as sp
+
+# плевали мы title case
+class ffmpeg:
+    def __init__(self, fps, output):
+        self.cmd_out = [
+            'ffmpeg',
+            # используем pipe
+            '-i', '-',
+            # формат входных данных
+            '-f', 'image2',
+            # fps
+            '-r', str(fps),
+            # формат выходных данных
+            '-c:v', 'libx264',
+            # игнорируем существующий файл + имя выходного файла
+            '-y', str(output)
+        ]
+        # создаём наш pipe
+        self.pipe = sp.Popen(self.cmd_out, stdin=sp.PIPE)
+
+    # будем функцией пропихивать картинки в pipe
+    def push(self, frame):
+        frame.save(self.pipe.stdin, 'PNG')
+
+    # и при завершении закрывать pipe
+    def __del__(self):
+        self.pipe.stdin.close()
+        self.pipe.wait()
+
+        if self.pipe.returncode != 0:
+            raise sp.CalledProcessError(self.pipe.returncode, self.cmd_out)
+```
+
+И остальной код
+```python
+from PIL import Image, UnidentifiedImageError
+import numpy as np
+
+# загрузка фото на изи
+def load_image(file):
+    try:
+        return Image.open(file)
+    except UnidentifiedImageError:
+        print(f'[error]: cannot open {file} file')
+        exit()
+
+# используем numpy для генерации перехода
+def alpha_range(start, stop, step):
+    v_up = np.arange(start, stop + step, step)
+    v_down = np.arange(stop, start - step, -step)
+    return list(v_up) + list(v_down)
+
+# смешивание на изи
+def blend(i1, i2, alpha):
+    return Image.blend(i1, i2, alpha)
+
+
+# параметры видео
+output = 'render.mp4'
+transition_time = 5
+fps = 25
+step = 2.0 / (fps * transition_time)
+
+# наши фоточки
+i1 = load_image('../demo/01.png')
+i2 = load_image('../demo/02.png')
+
+# создаём наш pipe
+render = ffmpeg(fps=fps, output=output)
+# смешиваем и записываем в pipe
+for alpha in alpha_range(0, 1, step):
+    render.push(blend(i1, i2, alpha))
+```
+
+В результате скорость обработки кадров оказался ниже плинтуса (~0.5 fps), да и pipe часто обрывался.
+
+# 2-ый блин, оптимизация
+На втором этапе решил упростить задачу для ffmpeg и передавать не png картинки, а сразу сырые данные в формате `rgb24`.
+
+Начнём как всегда с `ffmpeg`
+```python
+import subprocess as sp
+
+# всё ещё пофиг на title case
+class ffmpeg:
+    def __init__(self, fps, size, output):
+        self.cmd_out = [
+            'ffmpeg',
+            # сырой формат данных в виде rgb24, т.е. по 8 бит на канал
+            '-f', 'rawvideo', '-pix_fmt', 'rgb24',
+            # размер фото, обратный порядок из-за формата представления у numpy
+            '-video_size', f'{size[1]}x{size[0]}',
+            # fps
+            '-r', str(fps),
+            # наш pipe
+            '-i', '-',
+            # профиль кодирования видео оптимизирующий под youtube (также подходит для telegram)
+            '-c:v', 'libx264', '-preset', 'slow', '-profile:v', 'high', '-crf', '18', '-coder', '1',
+            # формат картинки в видео
+            '-pix_fmt', 'yuv420p',
+            # с размеров кратным 2-ке по высоте
+            '-vf', 'scale=iw:-2',
+            # ещё параметры оптимизации под youtube
+            '-movflags', '+faststart', '-g', '30', '-bf', '2',
+            # игнорируем существующий файл + имя выходного файла
+            '-y', str(output)
+        ]
+        # теперь у pipe будет буфер по размеру изображения
+        self.pipe = sp.Popen(self.cmd_out, stdin=sp.PIPE, bufsize=3 * size[0] * size[1])
+
+    def push(self, frame):
+        # пишем байты прямо в pipe
+        self.pipe.stdin.write(frame)
+
+    # аналогично прошлому коду
+    def __del__(self):
+        self.pipe.stdin.close()
+        self.pipe.wait()
+
+        if self.pipe.returncode != 0:
+            raise sp.CalledProcessError(self.pipe.returncode, self.cmd_out)
+```
+
+Загрузка изображений тоже преобразилась
+```python
+from PIL import Image, UnidentifiedImageError
+import numpy as np
+
+def load_image(file):
+    try:
+        image = Image.open(file)
+        # преобразуем в массив numpy с RGB палитрой
+        result = np.array(image.convert('RGB'), dtype=np.float)
+        # нам нужен размер изображения
+        size = result.shape
+        # и возвращаем в одномерном виде, т.к. проще работать + размер изображения
+        return result.reshape((size[1] * size[0] * size[2],)), size
+    except UnidentifiedImageError:
+        print(f'[error]: cannot open {file} file')
+        exit()
+```
+
+Функция `alpha_range` вообще не изменилась, а вот `blend` стала интереснее
+```python
+def blend(i1, i2, alpha):
+    # создаём пустой массив
+    out = np.zeros_like(i1)
+    # проходим по всем элементам и смешиваем их
+    out[:] = i1[:] * alpha + i2[:] * (1.0 - alpha)
+    # возвращаем набор байтов
+    return out.astype(np.uint8).tobytes()
+```
+
+И код запуска изменился самую малость
+```python
+# .. пропустим константы ..
+i1, size = load_image('../demo/01.png')
+i2, _ = load_image('../demo/02.png')
+
+render = ffmpeg(fps=fps, size=size, output=output)
+for alpha in alpha_range(0, 1, step):
+    render.push(blend(i1, i2, alpha))
+```
+
+В этой версии сразу видно сильный прирост по скорости работы.
+
+# 3-ая блин, rust
+Реализовав рабочий прототип на python я решил всё это дело переписать на rust.
+
+Поискав библиотеки для работы с изображениям наткнулся на [lodepng](https://crates.io/crates/lodepng) у которой минимальное количество зависимостей, да и API простое.
+
+Перейдём же к коду.
+
+```rust
+// объявим нашу структуру, которая будет хранить все нужные нам данные
+#[derive(Debug, Default)]
+struct Render {
+    // список из значений альфы
+    transition: Vec<f32>,
+    // 1-ая фотка в rgb24
+    image1: Vec<u8>,
+    // 2-я
+    image2: Vec<u8>,
+    // имя выходного видео
+    output: String,
+    // размер фото
+    size: Size,
+}
+
+// структура для размера изображения
+#[derive(Debug, Default, PartialEq, Eq)]
+struct Size {
+    width: usize,
+    height: usize,
+}
+
+// с одной функцией
+impl Size {
+    fn new(width: usize, height: usize) -> Size {
+        Size { width, height }
+    }
+}
+```
+
+Теперь стоит определиться с функциями структуры `Render`, а именно нужны:
+1. загрузка изображений
+2. добавление переходов
+3. задание выходного файла
+4. запуск рендеринга
+5. смешивание фотографий
+
+```rust
+impl Render {
+    // 1
+    pub fn first_image<P: AsRef<Path>>(mut self, filename: P) -> Render {}
+    pub fn second_image<P: AsRef<Path>>(mut self, filename: P) -> Render {}
+    // 2
+    pub fn add_transition(mut self, start: f32, stop: f32, step: f32) -> Render {}
+    // 3
+    pub fn set_output_file(mut self, output: &str) -> Render {}
+    // 4
+    pub fn render(self, fps: u8) {}
+    // 5
+    fn blend(&self, alpha: f32) -> Vec<u8> {}
+}
+```
+
+Сразу отмечу, что функции 1-3 сделаны специально в стиле [паттерна строитель](https://en.wikipedia.org/wiki/Builder_pattern).
+
+Функция 4 будет поглощать наш объект, чтобы после рендеринга уже нельзя было ничего сделать.
+
+И ещё, все функции, кроме 5-ой, доступны для внешнего использования.
+
+
+Стоит упомянуть сразу вспомогательную функцию, которая нам поможет в загрузке изображений в `rgb24`.
+
+```rust
+extern crate lodepng;
+extern crate rgb;
+
+use std::path::Path;
+use crate::rgb::ComponentBytes;
+
+// вспомотагельная функция по загрузке изображений
+fn load_image<P: AsRef<Path>>(filename: P) -> Result<(Vec<u8>, Size), lodepng::Error> {
+    // загружаем нашу pngшку
+    let image = lodepng::decode24_file(filename)?;
+    // заполняем структуру размера фото
+    let size = Size::new(image.width, image.height);
+    // возврашаем данные в нужном нам виде
+    Ok((image.buffer.as_bytes().to_vec(), size))
+}
+```
+
+Базовые приготовления окончены, можно переходить к реализации функций `Render`.
+
+Начнём с простого, с пунктов 1 и 3:
+```rust
+pub fn first_image<P: AsRef<Path>>(mut self, filename: P) -> Render {
+    // загружаем фото
+    let (image, size) = load_image(filename).unwrap();
+    // и заполянем наши переменные
+    self.image1 = image;
+    self.size = size;
+    // передаём дальше нашу структуру
+    self
+}
+
+pub fn second_image<P: AsRef<Path>>(mut self, filename: P) -> Render {
+    let (image, size) = load_image(filename).unwrap();
+    // никаких переходов в случае картинок разного размера
+    if self.size != size {
+        panic!("image size mismatch");
+    }
+    self.image2 = image;
+    self
+}
+
+pub fn set_output_file(mut self, output: &str) -> Render {
+    // просто передаём владение над строкой
+    self.output = output.to_owned();
+    self
+}
+```
+
+Генерацию перехода (значений альфа) сделаем с возможностью увеличения и уменьшения в зависимости от знака `step`.
+
+```rust
+pub fn add_transition(mut self, start: f32, stop: f32, step: f32) -> Render {
+    // эти два варианта мы игнорируем, т.к. они расходятся
+    let bad_condition = (start > stop && step > 0.0) || (start < stop && step < 0.0);
+    // для всех остальных считаем количество шагов
+    let count = if !bad_condition {
+        ((start - stop) / step).abs() as u32 + 1
+    } else {
+        0
+    };
+    // и генерируем переход
+    let mut transition: Vec<f32> = (0..count).map(|x| start + x as f32 * step).collect();
+    self.transition.append(&mut transition);
+    self
+}
+```
+
+Реализация простая - сначала проверяем, что мы сможем за конечное число шагом завершить построение,
+а потом рассчитываем количество шагов которое нужно сделать и добавляем эти значения в массив `transition`.
+
+Код даже можно оптимизировать перенеся добавление новых значений под условие `if`.
+
+Пойдём далее, к коду смешивания
+```rust
+fn blend(&self, alpha: f32) -> Vec<u8> {
+    // инициализируем выходной массив по размеру изображения
+    let mut r = vec![0; self.image1.len()];
+    // итерируемся по 3-м массивам, но r у нас будет изменяемый
+    for (d, (a, b)) in r.iter_mut().zip(self.image1.iter().zip(self.image2.iter())) {
+        // записываем в массив новое значение расчитанное по формуле
+        *d = (*a as f32 * alpha + *b as f32 * (1.0 - alpha)).round() as u8;
+    }
+    // готово!
+    r
+}
+```
+
+Осталось самое тривиальное - создать пайп между программой и ffmpeg для передачи данных
+```rust
+pub fn render(self, fps: u8) {
+    // аргументы для ffmpeg
+    let arguments = [
+        // входной формат фото
+        "-f", "rawvideo", "-pix_fmt", "rgb24",
+        // + размер
+        "-video_size", &format!("{}x{}", self.size.width, self.size.height),
+        // + fps
+        "-r", &format!("{}", fps),
+        // нам нужен pipe
+        "-i", "-",
+        // профиль кодирования видео оптимизирующий под youtube (также подходит для telegram)
+        "-c:v", "libx264", "-preset", "slow", "-profile:v", "high", "-crf", "18", "-coder", "1",
+        // формат картинки в видео
+        "-pix_fmt", "yuv420p",
+        // с размеров кратным 2-ке по высоте
+        "-vf", "scale=iw:-2",
+        // ещё параметры оптимизации под youtube
+        "-movflags", "+faststart", "-g", "30", "-bf", "2",
+        // игнорируем существующий файл + имя выходного файла
+        "-y", &self.output,
+    ];
+    // создаём процесс
+    let mut process = match Command::new("ffmpeg")
+        // с аргументами
+        .args(&arguments)
+        // и stdin как pipe
+        .stdin(Stdio::piped())
+        // спавним процесс
+        .spawn()
+    {
+        Err(why) => panic!("couldn't spawn ffmpeg: {}", why),
+        Ok(process) => process,
+    };
+    {
+        // заимствуем stdin в таком виде чтобы не захватить process
+        let stdin = process.stdin.as_mut().unwrap();
+        // и фигачим в него наши картиночки
+        for alpha in &self.transition {
+            // смешиваем в нужных пропорциях
+            let img = self.blend(*alpha);
+            // и записываем в pipe
+            match stdin.write_all(&img) {
+                Err(why) => panic!("couldn't write to ffmpeg stdin: {}", why),
+                Ok(_) => (),
+            };
+        }
+    }
+    // ожидаем завершения ffmpeg
+    let _result = process.wait().unwrap();
+}
+```
+
+И заканчивая напишем `main`
+```rust
+fn main() {
+    // время ролика в секундах
+    let transition_time = 5;
+    // количество кадров в секунду у выходного видео
+    let fps = 25;
+    // шаг для создания перехода на заданное время и fps
+    // 2.0, т.к. у нас будет 2 перехода
+    let step = 2.0 / (fps * transition_time) as f32;
+    // тут должно быть всё понятно
+    let i = Render::default()
+        .first_image("./demo/01.png")
+        .second_image("./demo/02.png")
+        // преобразование 1-ой фотографии во 2-ую
+        .add_transition(0.0, 1.0, step)
+        // и обратно
+        .add_transition(1.0, 0.0, -step)
+        .set_output_file("render.mp4");
+    i.render(fps);
+}
+```
+
+# Заключение
+В результате получаем следующее
+<video class="video media" id="video-coldfavorableflicker" alt="transition render ffmpeg demo 2.5d GIF" autoplay="" playsinline="" preload="auto" poster="https://thumbs.gfycat.com/ColdFavorableFlicker-mobile.jpg" style="max-width: 640px; margin: 0px auto; display: block;" tabindex="-1" width="1280" height="720">
+    <source src="https://thumbs.gfycat.com/ColdFavorableFlicker-mobile.mp4" type="video/mp4">
+    <source src="https://giant.gfycat.com/ColdFavorableFlicker.webm" type="video/webm">
+    <source src="https://giant.gfycat.com/ColdFavorableFlicker.mp4" type="video/mp4">
+    <source src="https://thumbs.gfycat.com/ColdFavorableFlicker-mobile.mp4" type="video/mp4">
+</video>
+
+На сегодня всё. Исходники можно найти [по следующей ссылке](https://github.com/FreeCX/vf-transtion).
+
+Всем пока!
+
+# Что почитать
+1. [Alpha compositing](https://en.wikipedia.org/wiki/Alpha_compositing)
+2. [Доки по ffmpeg](https://ffmpeg.org/documentation.html)
+3. [Как быть крутым программистом](https://www.youtube.com/watch?v=dQw4w9WgXcQ)
