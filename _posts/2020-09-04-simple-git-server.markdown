@@ -11,6 +11,7 @@ layout: post
 
 Сначала нам нужно создать bare версию репозитория, который будем хостить. Предлагаю склонировать какой-нибудь репозиторий с github.
 ```bash
+$ mkdir server-folder
 $ cd ~/server-folder
 $ git clone --bare https://github.com/pinecrew/tini tini.git
 ```
