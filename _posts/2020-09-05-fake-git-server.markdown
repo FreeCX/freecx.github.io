@@ -67,23 +67,23 @@ ref: refs/heads/master
 
 Можем немного схитрить и положить эти объекты в bare репозиторий, взяв их из основного. Просто скопируйте все папки (кроме `info` и `pack`) из репозитория в bare и обращение с клонированием репозитория сразу измениться.
 ```bash
-127.0.0.1 - - [05/Sep/2020 22:19:07] "GET /tini.git/info/refs?service=git-upload-pack HTTP/1.1" 200 -
-127.0.0.1 - - [05/Sep/2020 22:19:07] "GET /tini.git/HEAD HTTP/1.1" 200 -
-127.0.0.1 - - [05/Sep/2020 22:19:07] "GET /tini.git/objects/e2/9a0f6430889930005e6d3494e905aee019d4b5 HTTP/1.1" 200 -
-127.0.0.1 - - [05/Sep/2020 22:19:07] code 404, message File not found
-127.0.0.1 - - [05/Sep/2020 22:19:07] "GET /tini.git/objects/5d/2ef7493690f6248a55c5657a23e5c25514240c HTTP/1.1" 404 -
-127.0.0.1 - - [05/Sep/2020 22:19:07] code 404, message File not found
-127.0.0.1 - - [05/Sep/2020 22:19:07] code 404, message File not found
-127.0.0.1 - - [05/Sep/2020 22:19:07] "GET /tini.git/objects/4f/2682ed22e139c2ccebe11705ccd49bf0b90c0b HTTP/1.1" 200 -
-127.0.0.1 - - [05/Sep/2020 22:19:07] "GET /tini.git/objects/info/http-alternates HTTP/1.1" 404 -
-127.0.0.1 - - [05/Sep/2020 22:19:07] "GET /tini.git/objects/9b/7de41f6a27f7a3c7d3539ba4bc1fbb2e852f4a HTTP/1.1" 404 -
-127.0.0.1 - - [05/Sep/2020 22:19:07] code 404, message File not found
-127.0.0.1 - - [05/Sep/2020 22:19:07] "GET /tini.git/objects/info/alternates HTTP/1.1" 404 -
-127.0.0.1 - - [05/Sep/2020 22:19:07] "GET /tini.git/objects/6a/3a45cbb1646758e8a0b5538633b3ee11cdca1b HTTP/1.1" 200 -
-127.0.0.1 - - [05/Sep/2020 22:19:07] "GET /tini.git/objects/dd/ec125ea25e4c9a556efd229d8efcaca8acd951 HTTP/1.1" 200 -
-127.0.0.1 - - [05/Sep/2020 22:19:07] "GET /tini.git/objects/info/packs HTTP/1.1" 200 -
-127.0.0.1 - - [05/Sep/2020 22:19:07] "GET /tini.git/objects/pack/pack-34100ba6403aebd2e96fa73c67bce942b18a6264.idx HTTP/1.1" 200 -
-127.0.0.1 - - [05/Sep/2020 22:19:07] "GET /tini.git/objects/pack/pack-34100ba6403aebd2e96fa73c67bce942b18a6264.pack HTTP/1.1" 200 -
+127.0.0.1 - - [XX/Yyy/ZZZZ AA:BB:CC] "GET /tini.git/info/refs?service=git-upload-pack HTTP/1.1" 200 -
+127.0.0.1 - - [XX/Yyy/ZZZZ AA:BB:CC] "GET /tini.git/HEAD HTTP/1.1" 200 -
+127.0.0.1 - - [XX/Yyy/ZZZZ AA:BB:CC] "GET /tini.git/objects/e2/9a0f6430889930005e6d3494e905aee019d4b5 HTTP/1.1" 200 -
+127.0.0.1 - - [XX/Yyy/ZZZZ AA:BB:CC] code 404, message File not found
+127.0.0.1 - - [XX/Yyy/ZZZZ AA:BB:CC] "GET /tini.git/objects/5d/2ef7493690f6248a55c5657a23e5c25514240c HTTP/1.1" 404 -
+127.0.0.1 - - [XX/Yyy/ZZZZ AA:BB:CC] code 404, message File not found
+127.0.0.1 - - [XX/Yyy/ZZZZ AA:BB:CC] code 404, message File not found
+127.0.0.1 - - [XX/Yyy/ZZZZ AA:BB:CC] "GET /tini.git/objects/4f/2682ed22e139c2ccebe11705ccd49bf0b90c0b HTTP/1.1" 200 -
+127.0.0.1 - - [XX/Yyy/ZZZZ AA:BB:CC] "GET /tini.git/objects/info/http-alternates HTTP/1.1" 404 -
+127.0.0.1 - - [XX/Yyy/ZZZZ AA:BB:CC] "GET /tini.git/objects/9b/7de41f6a27f7a3c7d3539ba4bc1fbb2e852f4a HTTP/1.1" 404 -
+127.0.0.1 - - [XX/Yyy/ZZZZ AA:BB:CC] code 404, message File not found
+127.0.0.1 - - [XX/Yyy/ZZZZ AA:BB:CC] "GET /tini.git/objects/info/alternates HTTP/1.1" 404 -
+127.0.0.1 - - [XX/Yyy/ZZZZ AA:BB:CC] "GET /tini.git/objects/6a/3a45cbb1646758e8a0b5538633b3ee11cdca1b HTTP/1.1" 200 -
+127.0.0.1 - - [XX/Yyy/ZZZZ AA:BB:CC] "GET /tini.git/objects/dd/ec125ea25e4c9a556efd229d8efcaca8acd951 HTTP/1.1" 200 -
+127.0.0.1 - - [XX/Yyy/ZZZZ AA:BB:CC] "GET /tini.git/objects/info/packs HTTP/1.1" 200 -
+127.0.0.1 - - [XX/Yyy/ZZZZ AA:BB:CC] "GET /tini.git/objects/pack/pack-34100ba6403aebd2e96fa73c67bce942b18a6264.idx HTTP/1.1" 200 -
+127.0.0.1 - - [XX/Yyy/ZZZZ AA:BB:CC] "GET /tini.git/objects/pack/pack-34100ba6403aebd2e96fa73c67bce942b18a6264.pack HTTP/1.1" 200 -
 ```
 
 Но git всё равно обращается к объектам в директории `pack`, т.к. похоже не все объекты лежат так просто.
