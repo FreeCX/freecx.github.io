@@ -430,7 +430,7 @@ fn main() {
 
 # Заключение
 В результате получаем следующее (нажми play через меню, если видео не работает).
-<video class="video media" id="video-coldfavorableflicker" alt="transition render ffmpeg demo 2.5d GIF" autoplay="" playsinline="" preload="auto" poster="https://thumbs.gfycat.com/ColdFavorableFlicker-mobile.jpg" style="max-width: 640px; max-height: 360px; margin: 0px auto; display: block;" tabindex="-1" width="1280" height="720">
+<video class="video media" id="video-coldfavorableflicker" alt="transition render ffmpeg demo 2.5d GIF" loop autoplay="" playsinline="" preload="auto" poster="https://thumbs.gfycat.com/ColdFavorableFlicker-mobile.jpg" style="max-width: 640px; max-height: 360px; margin: 0px auto; display: block;" tabindex="-1" width="1280" height="720">
     <source src="https://thumbs.gfycat.com/ColdFavorableFlicker-mobile.mp4" type="video/mp4">
     <source src="https://giant.gfycat.com/ColdFavorableFlicker.webm" type="video/webm">
     <source src="https://giant.gfycat.com/ColdFavorableFlicker.mp4" type="video/mp4">

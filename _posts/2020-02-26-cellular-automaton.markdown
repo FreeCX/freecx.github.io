@@ -153,7 +153,7 @@ def __str__(self):
 
 # Результат
 Вот и всё, давайте насладимся результатом!
-<video class="video media" id="video-cleartightafricanwilddog" alt="cellular automaton GIF" autoplay="" playsinline="" preload="auto" poster="https://thumbs.gfycat.com/ClearTightAfricanwilddog-mobile.jpg" style="max-width: 500px; margin: 0px auto; display: block;" tabindex="-1" width="500" height="500">
+<video class="video media" id="video-cleartightafricanwilddog" alt="cellular automaton GIF" loop autoplay="" playsinline="" preload="auto" poster="https://thumbs.gfycat.com/ClearTightAfricanwilddog-mobile.jpg" style="max-width: 500px; margin: 0px auto; display: block;" tabindex="-1" width="500" height="500">
     <source src="https://thumbs.gfycat.com/ClearTightAfricanwilddog-mobile.mp4" type="video/mp4">
     <source src="https://giant.gfycat.com/ClearTightAfricanwilddog.webm" type="video/webm">
     <source src="https://giant.gfycat.com/ClearTightAfricanwilddog.mp4" type="video/mp4">
