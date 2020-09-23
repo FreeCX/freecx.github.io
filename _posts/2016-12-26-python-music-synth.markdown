@@ -74,7 +74,12 @@ key_list = list(map(lambda x: ord(x), key_names))
 # состояние клавиш (нажато/не нажато)
 key_dict = dict([(key, False) for key in key_list])
 
+
 if __name__ == '__main__':
+    # длительность звука
+    duration_tone = 1/64.0
+    # генерируем тона с заданной длительностью
+    tones = generate_tones(duration_tone)
     # инициализируем
     p = pa.PyAudio()
     # создаём поток для вывода
