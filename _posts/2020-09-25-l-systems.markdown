@@ -1,0 +1,316 @@
+---
+title: Кратко о L-системах
+layout: post
+---
+
+Всем привет.
+
+Долго откладывал написание этой статьи, но наконец нашёл в себе силы и дописал её!
+
+Сегодня хотел бы показать интересную вещь как L-система или система Линденмайера.
+
+Краткая справка из вики, для общего развития:
+> L-система или система Линденмайера — это параллельная система переписывания и вид формальной грамматики.
+> L-система состоит из алфавита символов, которые могут быть использованы для создания строк, набора порождающих правил, которые задают правила подстановки вместо каждого символа, начальной строки («аксиомы»), с которой начинается построение, и механизма перевода образованной строки в геометрические структуры.
+
+Чтобы заинтересовать давайте сразу глянем на результат того, что в итоге получиться:
+<video class="video media" id="video-evenbrightgossamerwingedbutterfly" alt="sierpinski triangle GIF" loop autoplay="" playsinline="" preload="auto" poster="https://thumbs.gfycat.com/EvenBrightGossamerwingedbutterfly-mobile.jpg" style="max-width: 640px; margin: 0px auto; display: block;" tabindex="-1" width="660" height="564">
+    <source src="https://thumbs.gfycat.com/EvenBrightGossamerwingedbutterfly-mobile.mp4" type="video/mp4">
+    <source src="https://giant.gfycat.com/EvenBrightGossamerwingedbutterfly.webm" type="video/webm">
+    <source src="https://giant.gfycat.com/EvenBrightGossamerwingedbutterfly.mp4" type="video/mp4">
+    <source src="https://thumbs.gfycat.com/EvenBrightGossamerwingedbutterfly-mobile.mp4" type="video/mp4">
+</video>
+
+# Задача
+Есть некоторая аксиома и N порождающих правил. Применяя каждое из правил к аксиоме мы получаем следующую итерацию значения системы. Для лучшего объяснения лучше почитайте [вики][2] или [книжку][1].
+
+Нам надо же произвести итерацию алгоритма и отрисовать текущее состояние системы, а потом повторить ещё N число раз.
+
+Давайте рассмотрим на примере как происходит генерация для следующей системы:
+```
+переменные: A B
+аксиома: A
+правила:
+    A -> AB
+    B -> A
+```
+
+0. A
+1. AB
+2. ABA
+3. ABAAB
+
+На нулевом шаге у нас по сути ничего нет и мы просто подставляем значение аксиомы.
+
+На первом шаге преобразуем A в AB по правилу A.
+
+На втором шаге А преобразуется в AB, а B преобразуется в A.
+
+И на третьем шаге первая и последняя A в AB, а В, та что в середине в A. И в результате получаем ABAAB.
+
+Надеюсь на данном этапе уже понятен смысл преобразований.
+
+Остаётся только назначить каждому правилу некоторую команду. Допустим A -> x + 1, а B -> y + 1.
+
+Обновим систему правил:
+```
+переменные: A B
+аксиома: A
+правила:
+    A -> AB
+    B -> A
+перемещение:
+    A -> x + 1
+    B -> y + 1
+```
+
+Исполнив полученный результат по определенным командам мы получаем интересное поведение системы.
+
+Для ABAAB, если принять начальное положение (x, y) за (0, 0) получаем: (3, 2).
+- A: (1, 0)
+- B: (1, 1)
+- A: (2, 1)
+- A: (3, 1)
+- B: (3, 2)
+
+Вообще дополнительные правила можно придумать любые, но у нас будет в основном перемещение с отрисовкой.
+
+# Реализация
+Сразу представлю вспомогательный код с краткими комментариями, а потом перейдём к основному коду.
+```python
+from copy import deepcopy
+from pathlib import Path
+import subprocess as sp
+import argparse
+import json
+import math
+
+from PIL import Image, ImageDraw
+
+# рендер через ffmpeg
+# смотри статью: https://freecx.github.io/blog/2020/07/23/2.5d-effect
+class ffmpeg:
+    def __init__(self, fps, output):
+        # команды ffmpeg
+        self.cmd_out = [
+            'ffmpeg', '-i', '-', '-f', 'image2pipe', '-r', str(fps), '-c:v', 'libx264', '-preset', 'slow',
+            '-profile:v', 'high', '-crf', '18', '-coder', '1', '-pix_fmt', 'yuv420p', '-vf', 'scale=iw:-2',
+            '-movflags', '+faststart', '-g', '30', '-bf', '2', '-y', str(output),
+        ]
+        self.pipe = sp.Popen(self.cmd_out, stdin=sp.PIPE)
+
+    def push(self, frame):
+        # будем передавать PNGхи через pipe
+        frame.save(self.pipe.stdin, 'PNG')
+
+    def __del__(self):
+        # корректно завершаем работу
+        self.pipe.stdin.close()
+        self.pipe.wait()
+
+        if self.pipe.returncode != 0:
+            raise sp.CalledProcessError(self.pipe.returncode, self.cmd_out)
+
+#
+# здесь будет код генерирующий кадры L-системы
+#
+
+# функция выполняющая модель из файла
+def execute_model(filename, *, savename=None):
+    with open(filename, 'r') as jsf:
+        # тут наша модель
+        data = json.load(jsf)
+        # генерируем финальный результат L-системы (прогон всех итераций)
+        result = generate(data['axiom'], data['iterations'], data['generate_rules'])
+        # определяем размер выходного видел делая пререндер модели
+        state = prerender(result, data['start_angle'], data['draw_rules'])
+        # рендерим видео каждого шага алгоритма
+        render(savename, state, result, data['start_angle'], data['draw_rules'])
+
+
+if __name__ == '__main__':
+    # парсинг аргументов командой строки
+    parser = argparse.ArgumentParser(description='Draw L System model')
+    parser.add_argument('-m', metavar='model', type=str, default=None, help='input model file')
+    args = parser.parse_args()
+    if args.m:
+        # имя файла выходного видео по имени используемой модели
+        renamer = lambda model: str(model).rsplit('.', 1)[0] + '.mp4'
+        model = Path(args.m)
+        # если в -m передали папку, то обрабатываем каждый из файлов
+        if model.is_dir():
+            for file in model.iterdir():
+                print(f'> processing {file}')
+                # выполняем и рендерим модель
+                execute_model(file, savename=renamer(file))
+        else:
+            print(f'> processing {model}')
+            execute_model(model, savename=renamer(model))
+    else:
+        parser.print_help()
+```
+
+Теперь перейдём к функциям рендеринга изображений
+```python
+# пререндер для определения размера холста
+def prerender(cmds, angle, rules, border=10):
+    # инициализируем границы холста нулями
+    xmin, xmax, ymin, ymax, x, y = [0] * 6
+
+    # итерируемся по командам
+    for symbol in cmds:
+        # выполняем текущее правило и получаем текущее положение курсора
+        x, y, angle = execute(x, y, angle, symbol, rules)
+        # обновляем границы холста
+        xmin, xmax = min(x, xmin), max(x, xmax)
+        ymin, ymax = min(y, ymin), max(y, ymax)
+
+    # выводим размер картинки
+    width = abs(xmin) + abs(xmax)
+    height = abs(ymin) + abs(ymax)
+    # с окрушлением до чётных (нужно для mp4)
+    if width % 2 != 0:
+        width += 1
+    if height % 2 != 0:
+        height += 1
+    # сдвиги по осям
+    shift_x = abs(xmin)
+    shift_y = abs(ymin)
+    # и возвращаем результирующие размеры холста с границами
+    return (width + 2 * border, height + 2 * border, shift_x + border, shift_y + border)
+
+
+# функция отрисовки
+def render(output, state, cmds, angle, rules):
+    # положения курсора
+    px, py, lx, ly = [0] * 4
+    # размеры холста + сдвиги
+    w, h, sx, sy = state
+
+    # создаём наш холст
+    img = Image.new('RGB', (w, h), 'white')
+    # и получаем объект на котором можно рисовать
+    drw = ImageDraw.Draw(img)
+    # инициализируем pipe с ffmpeg
+    render = ffmpeg(fps=24, output=output)
+
+    # итерируемся по командам
+    for symbol in cmds:
+        # выполняем текущее правило и получаем текущее положение курсора
+        px, py, angle = execute(px, py, angle, symbol, rules)
+        # рисуем линию от прошлошо положения к текужему
+        drw.line((lx + sx, ly + sy, px + sx, py + sy), fill=(0, 0, 0))
+        # обновляем прошлое положение не текущее
+        lx, ly = px, py
+        # и отдаём кадр ffmpeg
+        render.push(img)
+```
+
+А теперь перейдём к самым интересным функциям:
+```python
+def generate(init, iterations, rules):
+    """основная функция генерирующая новое состояние системы
+
+    init - стартовая аксиома
+    itereations - количество итераций
+    rules - список правил
+    """
+    for _ in range(iterations):
+        # создаём пустой список
+        res = []
+        # и заполняем его
+        for var in init:
+            # выполняем текущее правило и кладём в список
+            res.append(rules[var] if rules.get(var) else var)
+        # подменяем стартовую аксиому
+        init = ''.join(res)
+    return init
+
+
+def execute(x, y, angle, symbol, rules):
+    """функция исполняющая правила отрисовки
+
+    x, y - положение курсора
+    angle - угол
+    symbol - текущая команда
+    rules - все правила системы
+    """
+    # существует ли символ в системе?
+    if rules.get(symbol):
+        # парсим наши команды
+        if ':' in rules[symbol]:
+            # на тип команды и значение
+            cmd, var = rules[symbol].split(':')
+            cmd, var = cmd.lower(), float(var) if var.isdigit() else None
+        else:
+            cmd = rules.get(symbol)
+            var = None
+
+        # команда продвижения вперёд
+        if cmd == 'forward':
+            x += round(var * math.cos(math.radians(angle)))
+            y += round(var * math.sin(math.radians(angle)))
+        # команда поворота налево
+        elif cmd == 'left':
+            angle = (angle + var) % 360
+        # команда поворота направо
+        elif cmd == 'right':
+            angle = (angle - var) % 360
+
+    # возвращаем новое состояние
+    return x, y, angle
+```
+
+Вот и всё, всё готово!
+
+# Рендер
+В начале статьи был представлен рендер Треугольника Серпинского, который можно записать в нотации L-системы следующим образом:
+```
+переменные: F G
+аксиома: F-G-G
+правила:
+    F -> F-G+F+G-F
+    G -> GG
+перемещение:
+    F -> пройти вперёд на 20
+    G -> пройти вперёд на 20
+    + -> поворот налево на 120 градусов
+    - -> поворот направо на 120 градусов
+```
+
+Или сериализованный в json, для нашей программы:
+```json
+{
+    "axiom": "F-G-G",
+    "generate_rules": {
+        "F": "F-G+F+G-F",
+        "G": "GG"
+    },
+    "draw_rules": {
+        "F": "forward:20",
+        "G": "forward:20",
+        "+": "left:120",
+        "-": "right:120"
+    },
+    "iterations": 5,
+    "start_angle": 0
+}
+```
+
+Сохранив файл и скормив его программе получаем тот же результат, что и в начале статьи.
+
+# Заключение
+Хотел бы выразить особую признательность и поблагодарить мою лень за то что успела выйти статья на [хабре][2], прежде чем я продолжил дописывать эту статью!
+
+Исходники, и некоторые виды описанных систем, как всегда можно забрать по [ссылочке](https://gist.github.com/FreeCX/1a25983bf0c0f22e7b16e15ef0da7ecd). Модели запихнул в один файл, где ключ - имя файла, а значение - содержимое модели.
+
+А на этом пока всё, всем пока!
+
+# Что почитать
+1. Кроновер Р., Фракталы и хаос в динамических системах. Основы теории, 2000
+2. [L-systems](https://en.wikipedia.org/wiki/L-system)
+3. [Фракталы на Python. Пошаговое руководство](https://habr.com/ru/company/piter/blog/496538/)
+
+[1]: <http://inis.jinr.ru/sl/vol2/physics/Динамические системы и Хаос/Кроновер Р., Фракталы и хаос в динамических системах. Основы теории, 2000.pdf>
+[2]: <https://en.wikipedia.org/wiki/L-system>
+[3]: <https://habr.com/ru/company/piter/blog/496538/>
