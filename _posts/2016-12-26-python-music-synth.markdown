@@ -52,7 +52,7 @@ def generate_tones(duration):
     return tones
 ```
 
-Остаётся последнее -- вывести звук.
+Остаётся последнее — вывести звук.
 
 # Вывод звука
 Для вывода звука будем использовать кроссплатформенную библиотеку [PyAudio](https://people.csail.mit.edu/hubert/pyaudio/).
