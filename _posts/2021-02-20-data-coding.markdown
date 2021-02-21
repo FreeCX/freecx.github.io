@@ -52,11 +52,11 @@ import Text.Printf (printf)
 
 -- функция заглушка для кодирования сообщения
 encode :: String -> String
-encode x = x
+encode = id
 
 -- функция заглушка для декодирования сообщения
 decode :: String -> String
-decode x = x
+decode = id
 
 main = do
     input <- getLine
@@ -76,10 +76,6 @@ main = do
 
 Давайте определим их
 ```haskell
-import Data.List (elemIndex)
-import Data.Char (ord, chr)
-import Data.Bits (shiftL)
-
 -- добавление паддинга до размера size
 sizePadding :: ([a] -> [a] -> [a]) -> Int -> a -> [a] -> [a]
 sizePadding func size value array
@@ -127,7 +123,7 @@ group n l
 
 -- преобразование массива битов в число
 asInt :: [Int] -> Int
-asInt = foldl (\a b -> (a `shiftL` 1) + b) 0
+asInt = foldl (\a b -> (a * 2) + b) 0
 
 -- преобразование int в бинарное представление
 binary :: Int -> [Int]
@@ -146,6 +142,8 @@ toIntMap func = foldr (++) [] . map func
 Теперь можно перейти к самому главному
 ```haskell
 import Data.Maybe (fromJust)
+import Data.List (elemIndex)
+import Data.Char (ord, chr)
 
 -- наш алфавит
 alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ#@"
