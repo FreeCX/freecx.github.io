@@ -285,11 +285,11 @@ $ docker stop focused_swartz
 
 ### Пара слов о Docker compose
 
-> Данный раздел находится в пассивном написани!
+> Данный раздел находится в слишком пассивном написании!
 
-Теперь когда мы немного разобрались с docker'ом, давайте рассмотрим более интересную штуку, такую как *Вocker Сompose*!
+Теперь когда мы немного разобрались с docker'ом, давайте рассмотрим более интересную штуку, такую как *Docker Сompose*!
 
-Как говорит оффициальная документация
+Как говорит официальная документация
 
 > Compose is a tool for defining and running multi-container Docker applications.
 
@@ -564,7 +564,7 @@ $ docker-compose stop
 
 ## Полезные ссылки
 
-[1] [Docker](https://www.docker.com/) -- оффициальный сайт.
+[1] [Docker](https://www.docker.com/) -- официальный сайт.
 
 [2] [Docker Hub](https://registry.hub.docker.com/) -- хранилище **Docker** контейнеров.
 
