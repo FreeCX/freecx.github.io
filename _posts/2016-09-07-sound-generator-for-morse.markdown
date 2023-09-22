@@ -13,7 +13,7 @@ layout: post
 # Трансляция текста
 Для начала нам нужно написать код для трансляции текста в кодовую азбуку Морзе, для этого воспользуемся возможностью предоставляемую нам словарём.
 
-Для написания кода я буду использовать язык Rust и библиотеку lazy_static.
+Для написания кода я буду использовать язык Rust и библиотеку `lazy_static`.
 
 ```rust
 #[macro_use]
@@ -89,38 +89,18 @@ fn generate(freq: f32, duration: f32, volume: f32) -> Vec<u8> {
     // количество генерируемых сэмплов
     let total_samples: u32 = (sample_rate as f32 * duration).round() as u32;
     // угловая частота / частоте дискретизации
-    let w = 2.0 * std::f32::consts::PI * freq / sample_rate as f32;
-    // мы будем делать u16, а записывать по 2 блока u8 в формате BigEndian
+    let w = std::f32::consts::TAU * freq / sample_rate as f32;
+    // мы будем делать i16, а записывать по 2 блока u8 в формате little endian
     let mut buffer: Vec<u8> = Vec::with_capacity(2 * total_samples as usize);
     for k in 0..total_samples {
         // f = A * sin(kw)
         // A -- амплитуда сигнала
         // k -- номер сэмпла
-        let sample = (amplitude * (k as f32 * w).sin()) as u16;
-        // разбиваем u16 на два u8 в LittleEndian
-        let bytes = hi_lo(sample, Order::LittleEndian);
+        let sample = (amplitude * (k as f32 * w).sin()) as i16;
         // проталкиваем в буффер
-        buffer.extend_from_slice(&bytes);
+        buffer.extend_from_slice(&sample.to_le_bytes());
     }
     buffer
-}
-
-// enum порядка байтов
-enum Order {
-    BigEndian,
-    LittleEndian
-}
-
-// фукнция определения порядка следования байт
-fn hi_lo(data: u16, order: Order) -> [u8; 2] {
-    // старшый байт
-    let hi = ((data >> 8) & 0xff) as u8;
-    // младший байт
-    let lo = (data & 0xff) as u8;
-    match order {
-        Order::BigEndian => [hi, lo],
-        Order::LittleEndian => [lo, hi],
-    }
 }
 ```
 
@@ -202,7 +182,7 @@ use std::fs::File;
 use std::io::Write;
 
 //
-// место для hi_lo, generate и encode
+// место для generate и encode
 //
 
 fn main() {
