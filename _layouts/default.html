@@ -20,12 +20,15 @@ layout: compress
 		{% else %}
 			<div class="footer">
 				<span>Также читайте
-					<a href="https://antoniii.github.io/">antoniii</a>
+					<a href="https://antoniii.github.io/" title="ты сам сломал ссылку, так что ничего личного"><s>antoniii</s></a>
 					<a href="https://citrux.github.io/">citrux</a>
 					<a href="https://sputnikas.github.io/">sputnikas</a>
 				</span>
 			</div>
-			<script>console.warn('А спонсор статей в моём блоге -- моя лень -- спонсор статей.');</script>
+			<script>
+				let msg = ' А спонсор статей в моём блоге -- моя лень -- спонсор статей.';
+				['='.repeat(msg.length + 1), msg, '='.repeat(msg.length + 1)].forEach((v) => console.warn(v));
+			</script>
 		{% endif %}
 	</body>
 </html>
