@@ -4,12 +4,12 @@ description:        'програмирование и плюшки'
 
 # Author Info
 author_name:        'Алексей Голубев'
-author_emaill:       email
+author_emaill:      email
 author_gravatar:    8e8040e490e56a083328de6a21a816bd # Gravatar md5 hash
 author_github:      https://github.com/FreeCX
 
 # Site Settings
-#baseurl:            'https://freecx.github.io' # Base URL must end WITHOUT a slash, default: ""
+#baseurl:           'https://freecx.github.io' # Base URL must end WITHOUT a slash, default: ""
 permalink:          /blog/:year/:month/:day/:title # Post permalink
 timezone:           Europe/Volgograd # https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 
@@ -24,9 +24,10 @@ sass:
 
 # Other Params
 include:            [ "robots.txt" ]
-exclude:            [ "LICENSE", "README.md", "CNAME", "vendor", "Gemfile" ]
+exclude:            [ "LICENSE", "README.md", "Gemfile", "Gemfile.lock" ]
 plugins:
   - jekyll-sitemap
+  - jekyll-feed
   - redcarpet
   - kramdown
   - rouge
