@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block content %}
+<article>
+    <h1 class="title">404</h1>
+    <div class="divider"></div>
+    <blockquote>
+        <p>Страница, на которую Вы хотели перейти, не найдена.</p>
+        <p>
+            Пожайлуста не паникуйте и обратитесь за помощью к
+            <a href="https://www.youtube.com/watch?v=n1DeQQGxEyg">специалистам.</a>
+        </p>
+    </blockquote>
+</article>
+
+<div class="back">
+    <a href="{{ config.base_url }}">Назад</a>
+</div>
+{% endblock %}

@@ -102,7 +102,7 @@ fn main() {
 ```
 
 # уга буга!
-![unga-bunga](/assets/posts/mandelbrot_set.jpg "unga bunga")
+![unga-bunga](/posts/mandelbrot_set.jpg "unga bunga")
 
 # уга буга
 - [уга буга][unga-bunga]

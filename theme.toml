@@ -1,0 +1,17 @@
+name = "the-plain-b"
+description = "The Plain theme with extra stuff"
+tags = []
+license = "MIT"
+homepage = "https://github.com/FreeCX/freecx.github.io"
+min_version = "0.4.0"
+
+[extra]
+
+[author]
+name = "dr.FreeCX"
+homepage = "https://freecx.github.io"
+
+[original]
+author = "heiswayi"
+homepage = "https://heiswayi.github.io/the-plain/"
+repo = "https://github.com/heiswayi/the-plain"

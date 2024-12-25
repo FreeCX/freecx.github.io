@@ -7,12 +7,12 @@ title: Используем Docker
 
 Для начала немного информации с [википедии](https://ru.wikipedia.org/wiki/Docker) для общего развития
 
-> **Docker** — программное обеспечение для автоматизации развёртывания и управления приложениями в среде 
-> виртуализации на уровне операционной системы, например LXC. Позволяет «упаковать» приложение со всем его 
-> окружением и зависимостями в контейнер, который может быть перенесён на любой Linux-системе с поддержкой 
+> **Docker** — программное обеспечение для автоматизации развёртывания и управления приложениями в среде
+> виртуализации на уровне операционной системы, например LXC. Позволяет «упаковать» приложение со всем его
+> окружением и зависимостями в контейнер, который может быть перенесён на любой Linux-системе с поддержкой
 > cgroups в ядре, а также предоставляет среду по управлению контейнерами.
 >
-> Разрабатывается и поддерживается одноимённой компанией-стартапом, распространяется как свободное 
+> Разрабатывается и поддерживается одноимённой компанией-стартапом, распространяется как свободное
 > программное обеспечение под лицензией Apache 2.0. Написан на языке Go.
 
 А теперь к делу!
@@ -21,61 +21,61 @@ title: Используем Docker
 
 Для начала проверим версию установленного ядра
 
-```shell
+```bash
 $ uname -r
 ```
 
 Версия ядра должна быть не ниже 3.10, для того чтобы можно было использовать **Docker**.
 
-В зависимости от используемого дистрибутива установка **Docker** выглядит по разному. Настоятельно рекомендую 
+В зависимости от используемого дистрибутива установка **Docker** выглядит по разному. Настоятельно рекомендую
 обратится [к официальному гиду](https://docs.docker.com/installation/#installation) по установке.
 
 В моём случае установка под Arch Linux выполняется одной командой:
 
-```shell
+```bash
 $ sudo pacman -S docker
 ```
 
-Также вы можете установить **Docker** используя *sh* скрипт. Для загрузки скрипта потребуется *wget* или 
+Также вы можете установить **Docker** используя *sh* скрипт. Для загрузки скрипта потребуется *wget* или
 *curl*, или также можно использовать браузер.
 
-```shell
+```bash
 $ wget -qO- https://get.docker.com/ > docker_install.sh
 ```
 
 Теперь запустим установку (не забыв про sudo/su).
 
-```shell
+```bash
 $ sudo sh docker_install.sh
 ```
 
 После установки *желательно* добавить используемого пользователя в группу *docker*.
 
-```shell
+```bash
 $ sudo gpasswd -a <user> docker
 ```
 
 или
 
-```shell
+```bash
 $ sudo usermod -aG docker <user>
 ```
 
 На этом установка закончена. Запустим демон *docker* (в моём случае через *systemd*)
 
-```shell
+```bash
 $ sudo systemctl start docker
 ```
 
 и проверим работоспособность следующей командой
 
-```shell
+```bash
 $ docker run hello-world
 ```
 
 Если всё хорошо, то **Docker** скачает и запустит данный контейнер и программа выведет следующее
 
-```shell
+```bash
 Hello from **Docker**.
 This message shows that your installation appears to be working correctly.
 To generate this message, **Docker** took the following steps:
@@ -115,25 +115,25 @@ For more examples and ideas, visit:
 
 #### Запуск bash
 
-Давайте сначала запустим простой контейнер с *bash* интерпретатором в нём и получим доступ к нему. 
+Давайте сначала запустим простой контейнер с *bash* интерпретатором в нём и получим доступ к нему.
 Скачаем образ-контейнер *base/archlinux* для экспериментов.
 
-```shell
+```bash
 $ docker pull base/archlinux
 ```
 
 При вызове команды *images* получим что-то в виде:
 
-```shell
+```bash
 $ docker images
 REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
 base/archlinux      latest              dce0559daa1b        10 months ago       282.9 MB
 ```
 
-Теперь у нас есть образ для создания контейнеров. Можно перейти непосредственно к запуску *bash* 
+Теперь у нас есть образ для создания контейнеров. Можно перейти непосредственно к запуску *bash*
 внутри контейнера. Делается это следующей командой
 
-```shell
+```bash
 $ docker run -it --entrypoint /bin/bash base/archlinux
 ```
 
@@ -145,28 +145,28 @@ $ docker run -it --entrypoint /bin/bash base/archlinux
 
 В случае успеха **Docker** перенаправит нас на созданный tty внутри контейнера
 
-```shell
+```bash
 [root@f64a7c5309f9 /] #
 ```
 
-Здесь можно выполнять любые действия, а после зафиксировать изменения в контейнере. Но на текущий 
+Здесь можно выполнять любые действия, а после зафиксировать изменения в контейнере. Но на текущий
 момент просто ограничимся запуском.
 
 Для получения информации по запущенным контейнерам используйте флаг *ps*.
 
-```shell
+```bash
 $ docker ps -a
 CONTAINER ID        IMAGE                      COMMAND                CREATED             STATUS                   PORTS               NAMES
 f64a7c5309f9        base/archlinux:latest      "/bin/bash"            2 minutes ago       Up 2 minutes                                 sleepy_bell
 ```
 
-По умолчанию **Docker** сам выдаёт названиям созданным контейнерам. В нашем случае — *sleepy_bell*, 
-но их также можно задавать вручную используя флаг *--name*. Для выхода из контейнера используйте 
+По умолчанию **Docker** сам выдаёт названиям созданным контейнерам. В нашем случае — *sleepy_bell*,
+но их также можно задавать вручную используя флаг *--name*. Для выхода из контейнера используйте
 команду *exit*.
 
 #### Запуск сайта
-Рассмотрим более интересный случай, когда нужно собрать свой контейнер и подключить каталог к нему. 
-Будем рассматривать развёртывание простого *flask* приложения на *python*. Все действия будем производить 
+Рассмотрим более интересный случай, когда нужно собрать свой контейнер и подключить каталог к нему.
+Будем рассматривать развёртывание простого *flask* приложения на *python*. Все действия будем производить
 в текущем каталоге.
 
 Содержимое файла *app/main.py*
@@ -185,7 +185,7 @@ if __name__ == "__main__":
 
 Для создания своего контейнера создадим файл с конфигурацией — *Dockerfile*, со следующим содержимым
 
-```text
+```dockerfile
 FROM base/archlinux
 MAINTAINER dr.FreeCX <email>
 RUN pacman -Sy && pacman -S python-flask python-pip --noconfirm
@@ -199,31 +199,31 @@ CMD ["python", "/app/main.py"]
 
 * _FROM base/archlinux_ — указывает на каком образе основывать новый образ-контейнер
 * _MAINTAINER dr.FreeCX \<email\>_ — указывает автора или сопровождающего этого контейнера
-* _RUN pacman -Sy && pacman -S python-flask python-pip --noconfirm_ — запускает в контейнере обновление 
+* _RUN pacman -Sy && pacman -S python-flask python-pip --noconfirm_ — запускает в контейнере обновление
 и установку пакетов
 * _WORKDIR /app_ — указывает на рабочую директорию данного контейнера
 * _EXPOSE 5000_ — устанавливаем открываемый порт
 * _VOLUME ["/app"]_ — указывает на подключаемый пользовательский том
-* _CMD ["python", "/app/main.py"]_ — отвечает за запуск команды в контейнере 
+* _CMD ["python", "/app/main.py"]_ — отвечает за запуск команды в контейнере
 (её можно переопределить используя флаг *--entrypoint* при запуске контейнера).
 
-На третьем шаге команды объединены в одну для того чтобы не создавать лишние коммиты в создаваемом 
+На третьем шаге команды объединены в одну для того чтобы не создавать лишние коммиты в создаваемом
 контейнере.
 
 Теперь необходимо собрать данный контейнер, для этого используем команду *build*
 
-```shell
+```bash
 $ docker build -t site-app .
 ```
 
-Флаг *-t* отвечает за имя контейнера-образа (ну или tag) и точка в конце команды указывает на поиск 
+Флаг *-t* отвечает за имя контейнера-образа (ну или tag) и точка в конце команды указывает на поиск
 файла *Dockerfile* в текущей директории.
 
 Если всё прошло удачно, то увидим следующее
 
-```text
+```bash
 Sending build context to Docker daemon 43.01 kB
-Sending build context to Docker daemon 
+Sending build context to Docker daemon
 Step 0 : FROM base/archlinux
  ---> dce0559daa1b
 Step 1 : MAINTAINER dr.FreeCX <email>
@@ -253,7 +253,7 @@ Successfully built 8163426a880f
 
 Выполнив команду *images* убедимся, что появился новый образ
 
-```shell
+```bash
 $ docker images
 REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
 site-app            latest              8163426a880f        3 minutes ago       411.5 MB
@@ -261,7 +261,7 @@ site-app            latest              8163426a880f        3 minutes ago       
 
 Теперь осталось самое интересное — запуск нашего контейнера. Давайте же сделаем это
 
-```shell
+```bash
 $ docker run -it -d -p 8080:5000 -v "$PWD/app":/app site-app
 $ docker ps -a
 CONTAINER ID        IMAGE                      COMMAND                CREATED             STATUS                      PORTS                    NAMES
@@ -278,7 +278,7 @@ CONTAINER ID        IMAGE                      COMMAND                CREATED   
 
 Для остановки контейнера воспользуемся командой *stop* указав в качестве параметра имя либо *container id*
 
-```shell
+```bash
 $ docker stop 1d3b134e4095
 $ docker stop focused_swartz
 ```
@@ -296,7 +296,7 @@ $ docker stop focused_swartz
 то есть это тулза с помощью которой можно собрать систему из нескольких связанных docker-контейнеров, что мы и сделаем!
 
 #### Что будем ваять?
-Давайте напишем web-приложение доску, где можно будет оставить комментарий. 
+Давайте напишем web-приложение доску, где можно будет оставить комментарий.
 
 Для этого нам понадобится несколько компонентов:
 - flask — наш микрофреймворк
@@ -307,7 +307,7 @@ $ docker stop focused_swartz
 
 Структура нашего проекта будет следующей:
 
-```shell
+```bash
 .
 ├── docker-compose.yml
 ├── .env
@@ -440,7 +440,7 @@ db.session.commit()
 ```
 
 `requirements.txt`
-```text
+```
 flask==0.11.1
 flask_sqlalchemy==2.1
 gunicorn==19.6.0
@@ -448,20 +448,20 @@ psycopg2==2.6.2
 ```
 
 `Dockerfile`
-```text
+```dockerfile
 FROM python:3.4-onbuild
 ```
 
 #### nginx
 `Dockerfile`
-```text
+```dockerfile
 FROM tutum/nginx
 RUN rm /etc/nginx/sites-enabled/default
 ADD sites-enabled/ /etc/nginx/sites-enabled
 ```
 
 `flask_project`
-```text
+```
 server {
     listen 5000;
     charset utf-8;
@@ -485,7 +485,7 @@ server {
 
 #### Конфиги Docker Compose
 `.env`
-```text
+```bash
 DEBUG=True
 SECRET_KEY=its-my-super-secret-key-please-dont-forget-it
 DB_NAME=postgres
@@ -537,17 +537,17 @@ postgres:
 
 #### Финал
 Собираем наши контейнеры
-```shell
+```bash
 $ docker-compose build
 ```
 
 Cоздаём таблицу в БД
-```shell
+```bash
 $ docker-compose run web /usr/local/bin/python create_demo.py
 ```
 
 И наконец поднимаем их
-```shell
+```bash
 $ docker-compose up -d
 ```
 

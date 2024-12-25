@@ -1,0 +1,23 @@
+base_url = "https://freecx.github.io/"
+
+title = "Кодерный понедельник"
+description = "програмирование и плюшки"
+author = "Алексей Голубев"
+
+compile_sass = true
+minify_html = true
+generate_feeds = true
+build_search_index = true
+
+[markdown]
+highlight_code = true
+highlight_theme = "demain"
+
+[slugify]
+paths_keep_dates = true
+
+[translations]
+default_language = "ru"
+
+[extra]
+github_url = "https://github.com/FreeCX"

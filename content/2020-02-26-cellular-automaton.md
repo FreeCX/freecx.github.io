@@ -28,7 +28,7 @@ layout: post
 - главная и побочная диагональ являются активными
 - а также активны следующие точки: *(50, 0), (0, 50), (99, 50), (50, 99)*
 - состояние текущей ячейки (*cell[x, y]*) будем считать вот так:
-```text
+```python
 cell[x, y] = cell[x - 1, y - 1] ^ cell[x + 1, y - 1] ^ cell[x - 1, y + 1] ^ cell[x + 1, y + 1]
 ```
 
@@ -150,15 +150,6 @@ def __str__(self):
             result += '\n'
     return result
 ```
-
-# Результат
-Вот и всё, давайте насладимся результатом!
-<video class="video media" id="video-cleartightafricanwilddog" alt="cellular automaton GIF" loop autoplay="" playsinline="" preload="auto" poster="https://thumbs.gfycat.com/ClearTightAfricanwilddog-mobile.jpg" style="max-width: 500px; margin: 0px auto; display: block;" tabindex="-1" width="500" height="500">
-    <source src="https://thumbs.gfycat.com/ClearTightAfricanwilddog-mobile.mp4" type="video/mp4">
-    <source src="https://giant.gfycat.com/ClearTightAfricanwilddog.webm" type="video/webm">
-    <source src="https://giant.gfycat.com/ClearTightAfricanwilddog.mp4" type="video/mp4">
-    <source src="https://thumbs.gfycat.com/ClearTightAfricanwilddog-mobile.mp4" type="video/mp4">
-</video>
 
 # Заключение
 А на этом сегодня всё. Исходники на нескольких языках забирать [здесь](https://gist.github.com/FreeCX/d07e5cbf035bac095616de17e9046c8b).

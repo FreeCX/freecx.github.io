@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block content %}
+<main>
+    <section>
+        <ul>
+            {% for post in section.pages %}
+            <li>
+                <div class="post-date">
+                    <span>{{ post.date | date(format="%d/%m/%Y") }}</span>
+                </div>
+                <div class="title">
+                    <a href="{{ post.permalink }}">{{ post.title }}</a>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+</main>
+{% endblock %}

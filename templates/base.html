@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ru">
+    <head>
+        <meta charset="utf-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>{{ config.title }}</title>
+        <meta name="description" content="{{ config.description }}" />
+
+        <link rel="stylesheet" href="https://code.cdn.mozilla.net/fonts/fira.css" />
+        <link rel="icon" href="{{ get_url(path='favicon.png', trailing_slash=false) | safe }}" />
+        <link rel="apple-touch-icon" href="{{ get_url(path='touch-icon.png', trailing_slash=false) | safe }}" />
+        <link rel="stylesheet" href="{{ get_url(path='main.css', trailing_slash=false) | safe }}" />
+        <link rel="stylesheet" href="{{ get_url(path='syntax.css', trailing_slash=false) | safe }}" />
+    </head>
+    <body>
+        {% block header %}
+        <aside class="logo">
+            <a href="{{ config.extra.github_url }}">
+                <img src="{{ get_url(path='avatar.png', trailing_slash=false) | safe }}" class="gravatar" />
+            </a>
+            <span class="logo-prompt">Я на github</span>
+        </aside>
+        {% endblock %}
+
+        {% block content %}
+        {% endblock %}
+
+        {% block footer %}
+        <div class="footer">
+            <span
+                >Также читайте
+                <a href="https://antoniii.github.io/" title="ты сам сломал ссылку, так что ничего личного">
+                    <s>antoniii</s>
+                </a>
+                <a href="https://citrux.github.io/">citrux</a>
+                <a href="https://sputnikas.github.io/">sputnikas</a>
+            </span>
+        </div>
+        <script>
+            let msg = " А спонсор статей в моём блоге -- моя лень -- спонсор статей.";
+            ["=".repeat(msg.length + 1), msg, "=".repeat(msg.length + 1)].forEach((v) => console.warn(v));
+        </script>
+        {% endblock %}
+    </body>
+</html>
