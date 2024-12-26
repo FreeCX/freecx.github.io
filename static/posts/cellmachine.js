@@ -2,12 +2,16 @@ const width = 50;
 const height = 50;
 const scaleFactor = 10;
 const initCount = 10;
-const skipCountDefault = 3;
+const skipMax = 10;
 
 const canvas = document.getElementById("board");
 const ctx = canvas.getContext("2d");
+let playButton = document.getElementById("play");
+let speedText = document.getElementById("speed");
 
 var playing = true;
+var mouseDown = false;
+var skipCountDefault = 3;
 var skipCount = skipCountDefault;
 var curState = new Array(width * height);
 var newState = new Array(width * height);
@@ -17,12 +21,20 @@ function init() {
   canvas.width = width * scaleFactor;
   canvas.height = height * scaleFactor;
 
-  canvas.addEventListener("click", function (event) {
-    const pos = getMousePos(canvas, event);
-    pos.x = Math.trunc(pos.x / scaleFactor);
-    pos.y = Math.trunc(pos.y / scaleFactor);
-    curState[pos.y * width + pos.x] = true;
+  canvas.addEventListener("click", addCell);
+  canvas.addEventListener("mouseup", function (event) {
+    mouseDown = false;
   });
+  canvas.addEventListener("mousedown", function (event) {
+    mouseDown = true;
+  });
+  canvas.addEventListener("mousemove", function (event) {
+    if (mouseDown) {
+      addCell(event);
+    }
+  });
+
+  setSpeedText();
 
   for (i = 0; i < initCount; i++) {
     const index = random(width * height);
@@ -90,6 +102,13 @@ function generateRule() {
   return eval(`(f, x, y) => { return ${rule}; }`);
 }
 
+function addCell(event) {
+  const pos = getMousePos(canvas, event);
+  pos.x = Math.trunc(pos.x / scaleFactor);
+  pos.y = Math.trunc(pos.y / scaleFactor);
+  curState[pos.y * width + pos.x] = true;
+}
+
 function random(max) {
   return Math.floor(Math.random() * max);
 }
@@ -106,12 +125,36 @@ function getMousePos(canvas, evt) {
   };
 }
 
+function setSpeedText() {
+  speedText.textContent = skipMax - skipCountDefault;
+}
+
+function speedup() {
+  if (skipCountDefault > 0) {
+    skipCountDefault -= 1;
+    setSpeedText();
+  }
+}
+
+function slowdown() {
+  if (skipCountDefault < skipMax) {
+    skipCountDefault += 1;
+    setSpeedText();
+  }
+}
+
 function regenerate() {
   rule = generateRule();
 }
 
+function reset() {
+  curState = new Array(width * height);
+  newState = new Array(width * height);
+}
+
 function playpause() {
   playing = !playing;
+  playButton.textContent = playing ? "⏸" : "▶";
 }
 
 init();
