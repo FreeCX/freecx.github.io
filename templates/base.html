@@ -11,6 +11,7 @@
         <title>{{ config.title }}</title>
         <meta name="description" content="{{ config.description }}" />
         {% endif %}
+        <meta property="og:image" content="{{ get_url(path='touch-icon.png', trailing_slash=false) | safe }}" />
 
         <link rel="stylesheet" href="https://code.cdn.mozilla.net/fonts/fira.css" />
         <link rel="icon" href="{{ get_url(path='favicon.png', trailing_slash=false) | safe }}" />
