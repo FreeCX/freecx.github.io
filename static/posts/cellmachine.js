@@ -6,6 +6,7 @@ const skipMax = 10;
 
 const canvas = document.getElementById("board");
 const ctx = canvas.getContext("2d");
+let ruleText = document.getElementById("rule");
 let playButton = document.getElementById("play");
 let speedText = document.getElementById("speed");
 
@@ -31,6 +32,14 @@ function init() {
   canvas.addEventListener("mousemove", function (event) {
     if (mouseDown) {
       addCell(event);
+    }
+  });
+
+  ruleText.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      // this is very dangerous thing
+      rule = eval(`(f, x, y) => { return ${ruleText.value}; }`);
     }
   });
 
@@ -96,8 +105,8 @@ function generateRule() {
       const op = sample(["&", "|", "^"]);
       return `${a} ${v} ${op}`;
     }, "");
-  rule = rule.slice(0, rule.length - 2);
-  console.info(`rule:${rule}`);
+  rule = rule.slice(0, rule.length - 2).trim();
+  updateTextRule(rule);
   // evil smile
   return eval(`(f, x, y) => { return ${rule}; }`);
 }
@@ -155,6 +164,12 @@ function reset() {
 function playpause() {
   playing = !playing;
   playButton.textContent = playing ? "⏸" : "▶";
+}
+
+function updateTextRule(rule) {
+  ruleText.value = rule;
+  ruleText.style.minWidth = "500px";
+  ruleText.style.maxWidth = "500px";
 }
 
 init();
