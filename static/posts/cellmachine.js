@@ -123,10 +123,8 @@ function next() {
 
 // основная функция для получения состояние доски
 function V(f, x, y) {
-  // не факт что корректно обработал краевые условия, но так даже интереснее получается
-  if (x < 0 || x > width || y < 0 || y > height) {
-    return false;
-  }
+  x %= width;
+  y %= height;
   return f[y * width + x];
 }
 
