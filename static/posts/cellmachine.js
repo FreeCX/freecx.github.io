@@ -207,9 +207,9 @@ function regenerate() {
   rule = generateRule();
 }
 
-function reset() {
-  curState = new Array(width * height);
-  newState = new Array(width * height);
+function fill(value) {
+  curState.fill(value);
+  newState.fill(value);
 }
 
 function playpause() {
