@@ -35,9 +35,29 @@ var skipCountDefault = 3;
 // текущий счётчик пропущенных кадров
 var skipCount = skipCountDefault;
 // текущее состояние доски
-var curState = new Array(width * height);
+var curState = new Array(width * height).fill(false);
 // следующее состояние доски
-var newState = new Array(width * height);
+var newState = new Array(width * height).fill(false);
+
+// почти все возможные булевые операции над двумя аргументами
+// правила со всеми true и всеми false исключил
+const searchTable = [
+  [false, false, false, true],
+  [false, false, true, false],
+  [false, false, true, true],
+  [false, true, false, false],
+  [false, true, false, true],
+  [false, true, true, false],
+  [false, true, true, true],
+  [true, false, false, false],
+  [true, false, false, true],
+  [true, false, true, false],
+  [true, false, true, true],
+  [true, true, false, false],
+  [true, true, false, true],
+  [true, true, true, false],
+];
+
 // текущее генерирующее правило
 var rule = generateRule();
 
@@ -66,8 +86,7 @@ function init() {
   ruleText.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      // это опасно, так как никак не валидируем что пришло из поля ввода
-      rule = eval(`(f, x, y) => { return ${ruleText.value}; }`);
+      rule = parseRule(ruleText.value);
     }
   });
 
@@ -115,7 +134,7 @@ function next() {
   for (index = 0; index < width * height; index++) {
     const px = index % width;
     const py = Math.trunc(index / width);
-    newState[index] = rule(curState, px, py);
+    newState[index] = executeRule(rule, curState, px, py);
   }
   // для быстроты будем просто свопать текущее и следующее состояние
   [curState, newState] = [newState, curState];
@@ -123,8 +142,9 @@ function next() {
 
 // основная функция для получения состояние доски
 function V(f, x, y) {
-  x %= width;
-  y %= height;
+  if (x < 0 || y > width || y < 0 || y > height) {
+    return false;
+  }
   return f[y * width + x];
 }
 
@@ -137,19 +157,60 @@ function generateRule() {
       // сгенерируем для каждого операнда параметры в диапазоне [-val/2, val/2]
       const px = random(xRange) - xRange / 2;
       const py = random(yRange) - yRange / 2;
-      return `V(f, x + ${px}, y + ${py})`.replaceAll("+ -", "- ");
+      return `[${px},${py}]`;
     })
     .reduce((a, v) => {
       // раставим случайные операторы между операндами
-      const op = sample(["&", "|", "^"]);
-      return `${a} ${v} ${op}`;
+      const op = random(searchTable.length - 1);
+      return `${a} ${v} #${op}`;
     }, "");
   // удалим последний оператор
-  rule = rule.slice(0, rule.length - 2).trim();
+  rule = rule.slice(0, rule.lastIndexOf("#") - 1).trim();
   // выведем текст правила
   updateTextRule(rule);
-  // парсим код и возвращаем функцию
-  return eval(`(f, x, y) => { return ${rule}; }`);
+  // спарсим в более простой вид
+  return parseRule(rule);
+}
+
+// парсинг правила из строки
+function parseRule(rule) {
+  return rule.split(" ").map((i) => {
+    if (i.startsWith("[")) {
+      // ячейка
+      return i
+        .replace("[", "")
+        .replace("]", "")
+        .split(",")
+        .map((v) => parseInt(v, 10));
+    } else if (i.startsWith("#")) {
+      // оператор
+      return parseInt(i.replace("#", ""));
+    } else {
+      console.error(`Ошибка парсинга ${i}`);
+      return undefined;
+    }
+  });
+}
+
+// выполнение правила над ячейкой
+function executeRule(rule, state, px, py) {
+  // левый операнд
+  let left = V(state, px + rule[0][0], py + rule[0][1]);
+  let index = 1;
+
+  while (index < rule.length) {
+    // следующий аргмент - оператор
+    let op = rule[index];
+    index += 1;
+    // далее правый операнд
+    let right = V(state, px + rule[index][0], py + rule[index][1]);
+    index += 1;
+    let subindex = (left << 1) + right;
+    // применение оператора над операндами
+    left = searchTable[op][subindex];
+  }
+
+  return left;
 }
 
 // включить ячейку под курсором мыши
