@@ -1,0 +1,92 @@
+<!doctype html><html lang=ru><head><meta charset=utf-8><meta content="IE=edge" http-equiv=X-UA-Compatible><meta content="width=device-width,initial-scale=1" name=viewport><title>Пишем простой синтезатор на Python</title><meta content="Кодерный понедельник" name=description><meta content=https://freecx.github.io/touch-icon.png property=og:image><link href=https://code.cdn.mozilla.net/fonts/fira.css rel=stylesheet><link href=https://freecx.github.io/favicon.png rel=icon><link href=https://freecx.github.io/touch-icon.png rel=apple-touch-icon><link href=https://freecx.github.io/main.css rel=stylesheet><link href=https://freecx.github.io/syntax.css rel=stylesheet><body><aside class=logo><a href=https://github.com/FreeCX> <img class=gravatar src=https://freecx.github.io/avatar.png> </a><span class=logo-prompt>Я на github</span></aside><article><div class=center><h1>Пишем простой синтезатор на Python</h1><time>26 December 2016</time></div><div class=divider></div><p>В [предыдущем посте]({% post_url 2016-09-07-sound-generator-for-morse %}) я писал про генерацию звука на Rust`е для азбуки Морзе.<p>Сегод<em>няш</em>няя статья будет короткой, но в ней мы рассмотрим написание упрощенной версии программного синтезатора.<p>Ну что же, <strong>поехали</strong>!<h1 id=generatsiia-zvuka>Генерация звука</h1><p>Не будем изобретать что-то новое, а возьмём функцию генерации звука [из прошлой статьи]({% post_url 2016-09-07-sound-generator-for-morse %}) и адаптируем её под python:<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>import </span><span>numpy </span><span style=color:#8959a8>as </span><span>np
+</span><span>
+</span><span style=color:#8e908c># частота дискретизации
+</span><span style=color:#c82728>SAMPLE_RATE </span><span style=color:#3e999f>= </span><span style=color:#f07219>44100
+</span><span style=color:#8e908c># 16-ти битный звук (2 ** 16 -- максимальное значение для int16)
+</span><span style=color:#c82728>S_16BIT </span><span style=color:#3e999f>= </span><span style=color:#f07219>2 </span><span style=color:#3e999f>** </span><span style=color:#f07219>16
+</span><span>
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>generate_sample</span><span>(</span><span style=color:#f07219>freq</span><span>, </span><span style=color:#f07219>duration</span><span>, </span><span style=color:#f07219>volume</span><span>):
+</span><span>    </span><span style=color:#8e908c># амплитуда
+</span><span>    amplitude </span><span style=color:#3e999f>= </span><span style=color:#4271ae>np.</span><span style=color:#c82728>round</span><span style=color:#4271ae>(</span><span style=color:#c82728>S_16BIT </span><span style=color:#3e999f>* </span><span style=color:#4271ae>volume)
+</span><span>    </span><span style=color:#8e908c># длительность генерируемого звука в сэмплах
+</span><span>    total_samples </span><span style=color:#3e999f>= </span><span style=color:#4271ae>np.</span><span style=color:#c82728>round</span><span style=color:#4271ae>(</span><span style=color:#c82728>SAMPLE_RATE </span><span style=color:#3e999f>* </span><span style=color:#4271ae>duration)
+</span><span>    </span><span style=color:#8e908c># частоте дискретизации (пересчитанная)
+</span><span>    w </span><span style=color:#3e999f>= </span><span style=color:#f07219>2.0 </span><span style=color:#3e999f>* </span><span>np.pi </span><span style=color:#3e999f>* </span><span>freq </span><span style=color:#3e999f>/ </span><span style=color:#c82728>SAMPLE_RATE
+</span><span>    </span><span style=color:#8e908c># массив сэмплов
+</span><span>    k </span><span style=color:#3e999f>= </span><span style=color:#4271ae>np.</span><span style=color:#c82728>arange</span><span style=color:#4271ae>(</span><span style=color:#f07219>0</span><span style=color:#4271ae>, total_samples)
+</span><span>    </span><span style=color:#8e908c># массив значений функции (с округлением)
+</span><span>    </span><span style=color:#8959a8>return </span><span style=color:#4271ae>np.</span><span style=color:#c82728>round</span><span style=color:#4271ae>(amplitude </span><span style=color:#3e999f>* </span><span style=color:#4271ae>np.</span><span style=color:#c82728>sin</span><span style=color:#4271ae>(k </span><span style=color:#3e999f>* </span><span style=color:#4271ae>w))
+</span></code></pre><p>Теперь, когда у нас есть функция генерации звука любой частоты, длительности и громкости, остаётся сгененрировать ноты из <a href=https://ru.wikipedia.org/wiki/%D0%9E%D0%BA%D1%82%D0%B0%D0%B2%D0%BD%D0%B0%D1%8F_%D1%81%D0%B8%D1%81%D1%82%D0%B5%D0%BC%D0%B0#.D0.9F.D0.B5.D1.80.D0.B2.D0.B0.D1.8F_.D0.BE.D0.BA.D1.82.D0.B0.D0.B2.D0.B0>первой октавы</a> и подать их на устройство воспроизведения.<h1 id=generatsiia-zvuka-not>Генерация звука нот</h1><p>Запишем частоты нот первой октавы в массив и напишем функцию, которая будет их генерировать<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8e908c>#                      до      ре      ми     фа       соль    ля      си
+</span><span>freq_array </span><span style=color:#3e999f>= </span><span style=color:#4271ae>np.</span><span style=color:#c82728>array</span><span style=color:#4271ae>([</span><span style=color:#f07219>261.63</span><span style=color:#4271ae>, </span><span style=color:#f07219>293.66</span><span style=color:#4271ae>, </span><span style=color:#f07219>329.63</span><span style=color:#4271ae>, </span><span style=color:#f07219>349.23</span><span style=color:#4271ae>, </span><span style=color:#f07219>392.00</span><span style=color:#4271ae>, </span><span style=color:#f07219>440.00</span><span style=color:#4271ae>, </span><span style=color:#f07219>493.88</span><span style=color:#4271ae>])
+</span><span>
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>generate_tones</span><span>(</span><span style=color:#f07219>duration</span><span>):
+</span><span>    tones </span><span style=color:#3e999f>= </span><span>[]
+</span><span>    </span><span style=color:#8959a8>for </span><span>freq </span><span style=color:#8959a8>in </span><span>freq_array:
+</span><span>        </span><span style=color:#8e908c># np.array нужен для преобразования данных под формат 16 бит (dtype=np.int16)
+</span><span>        tone </span><span style=color:#3e999f>= </span><span style=color:#4271ae>np.</span><span style=color:#c82728>array</span><span style=color:#4271ae>(</span><span style=color:#c82728>generate_sample</span><span style=color:#4271ae>(freq, duration, </span><span style=color:#f07219>1.0</span><span style=color:#4271ae>), </span><span style=color:#f07219>dtype</span><span style=color:#3e999f>=</span><span style=color:#4271ae>np.int16)
+</span><span>        </span><span style=color:#4271ae>tones.</span><span style=color:#c82728>append</span><span style=color:#4271ae>(tone)
+</span><span>    </span><span style=color:#8959a8>return </span><span>tones
+</span></code></pre><p>Остаётся последнее — вывести звук.<h1 id=vyvod-zvuka>Вывод звука</h1><p>Для вывода звука будем использовать кроссплатформенную библиотеку <a href=https://people.csail.mit.edu/hubert/pyaudio/>PyAudio</a>.<p>Так же нам понадобится как-то отслеживать нажатия клавиш, чтобы наша программа была похожа на настоящий синтезатор. Поэтому я взял <a href=http://www.pygame.org/lofi.html>pygame</a>, т.к. он прост в работе. Вы же можете использовать то, что вам больше нравится!<p>Не будем медлить. Начнём!<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>import </span><span>pyaudio </span><span style=color:#8959a8>as </span><span>pa
+</span><span style=color:#8959a8>import </span><span>pygame
+</span><span>
+</span><span style=color:#8e908c># ... место для предыдущего кода ...
+</span><span>
+</span><span style=color:#8e908c># наши клавиши
+</span><span>key_names </span><span style=color:#3e999f>= </span><span>[</span><span style=color:#839c00>'a'</span><span>, </span><span style=color:#839c00>'s'</span><span>, </span><span style=color:#839c00>'d'</span><span>, </span><span style=color:#839c00>'f'</span><span>, </span><span style=color:#839c00>'g'</span><span>, </span><span style=color:#839c00>'h'</span><span>, </span><span style=color:#839c00>'j'</span><span>]
+</span><span style=color:#8e908c># коды клавиш
+</span><span>key_list </span><span style=color:#3e999f>= </span><span style=color:#c99e00>list</span><span style=color:#4271ae>(map(</span><span style=color:#8959a8>lambda </span><span style=color:#f07219>x</span><span style=color:#4271ae>: ord(x), key_names))
+</span><span style=color:#8e908c># состояние клавиш (нажато/не нажато)
+</span><span>key_dict </span><span style=color:#3e999f>= </span><span style=color:#c99e00>dict</span><span style=color:#4271ae>([(key, </span><span style=color:#f07219>False</span><span style=color:#4271ae>) </span><span style=color:#8959a8>for </span><span style=color:#4271ae>key </span><span style=color:#8959a8>in </span><span style=color:#4271ae>key_list])
+</span><span>
+</span><span>
+</span><span style=color:#8959a8>if </span><span>__name__ </span><span style=color:#3e999f>== </span><span style=color:#839c00>'__main__'</span><span>:
+</span><span>    </span><span style=color:#8e908c># длительность звука
+</span><span>    duration_tone </span><span style=color:#3e999f>= </span><span style=color:#f07219>1</span><span style=color:#3e999f>/</span><span style=color:#f07219>64.0
+</span><span>    </span><span style=color:#8e908c># генерируем тона с заданной длительностью
+</span><span>    tones </span><span style=color:#3e999f>= </span><span style=color:#c82728>generate_tones</span><span style=color:#4271ae>(duration_tone)
+</span><span>    </span><span style=color:#8e908c># инициализируем
+</span><span>    p </span><span style=color:#3e999f>= </span><span style=color:#4271ae>pa.</span><span style=color:#c82728>PyAudio</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># создаём поток для вывода
+</span><span>    stream </span><span style=color:#3e999f>= </span><span style=color:#4271ae>p.</span><span style=color:#c82728>open</span><span style=color:#4271ae>(</span><span style=color:#f07219>format</span><span style=color:#3e999f>=</span><span style=color:#4271ae>p.</span><span style=color:#c82728>get_format_from_width</span><span style=color:#4271ae>(</span><span style=color:#f07219>width</span><span style=color:#3e999f>=</span><span style=color:#f07219>2</span><span style=color:#4271ae>),
+</span><span style=color:#4271ae>                    </span><span style=color:#f07219>channels</span><span style=color:#3e999f>=</span><span style=color:#f07219>2</span><span style=color:#4271ae>, </span><span style=color:#f07219>rate</span><span style=color:#3e999f>=</span><span style=color:#c82728>SAMPLE_RATE</span><span style=color:#4271ae>, </span><span style=color:#f07219>output</span><span style=color:#3e999f>=</span><span style=color:#f07219>True</span><span style=color:#4271ae>)
+</span><span>    </span><span style=color:#8e908c># размер окна pygame
+</span><span>    window_size </span><span style=color:#3e999f>= </span><span style=color:#f07219>320</span><span>, </span><span style=color:#f07219>240
+</span><span>    </span><span style=color:#8e908c># настраиваем экран
+</span><span>    screen </span><span style=color:#3e999f>= </span><span style=color:#4271ae>pygame.display.</span><span style=color:#c82728>set_mode</span><span style=color:#4271ae>(window_size)
+</span><span>    </span><span style=color:#4271ae>pygame.display.</span><span style=color:#c82728>flip</span><span style=color:#4271ae>()
+</span><span>    running </span><span style=color:#3e999f>= </span><span style=color:#f07219>True
+</span><span>    </span><span style=color:#8959a8>while </span><span>running:
+</span><span>        </span><span style=color:#8e908c># обрабатываем события
+</span><span>        </span><span style=color:#8959a8>for </span><span>event </span><span style=color:#8959a8>in </span><span style=color:#4271ae>pygame.event.</span><span style=color:#c82728>get</span><span style=color:#4271ae>()</span><span>:
+</span><span>            </span><span style=color:#8e908c># событие закрытия окна
+</span><span>            </span><span style=color:#8959a8>if </span><span>event.type </span><span style=color:#3e999f>== </span><span>pygame.</span><span style=color:#c82728>QUIT</span><span>:
+</span><span>                running </span><span style=color:#3e999f>= </span><span style=color:#f07219>False
+</span><span>            </span><span style=color:#8e908c># нажатия клавиш
+</span><span>            </span><span style=color:#8959a8>if </span><span>event.type </span><span style=color:#3e999f>== </span><span>pygame.</span><span style=color:#c82728>KEYDOWN</span><span>:
+</span><span>                </span><span style=color:#8959a8>if </span><span>event.key </span><span style=color:#3e999f>== </span><span style=color:#4271ae>ord(</span><span style=color:#839c00>'q'</span><span style=color:#4271ae>)</span><span>:
+</span><span>                    running </span><span style=color:#3e999f>= </span><span style=color:#f07219>False
+</span><span>                </span><span style=color:#8e908c># обрабатываем нажатые клавиши по списку key_list
+</span><span>                </span><span style=color:#8959a8>for </span><span>(index, key) </span><span style=color:#8959a8>in </span><span style=color:#4271ae>enumerate(key_list)</span><span>:
+</span><span>                    </span><span style=color:#8959a8>if </span><span>event.key </span><span style=color:#3e999f>== </span><span>key:
+</span><span>                        </span><span style=color:#8e908c># зажимаем клавишу
+</span><span>                        key_dict[key] </span><span style=color:#3e999f>= </span><span style=color:#f07219>True
+</span><span>            </span><span style=color:#8e908c># отпускание клавиш
+</span><span>            </span><span style=color:#8959a8>if </span><span>event.type </span><span style=color:#3e999f>== </span><span>pygame.</span><span style=color:#c82728>KEYUP</span><span>:
+</span><span>                </span><span style=color:#8959a8>for </span><span>(index, key) </span><span style=color:#8959a8>in </span><span style=color:#4271ae>enumerate(key_list)</span><span>:
+</span><span>                    </span><span style=color:#8959a8>if </span><span>event.key </span><span style=color:#3e999f>== </span><span>key:
+</span><span>                        </span><span style=color:#8e908c># отпускаем клавишу
+</span><span>                        key_dict[key] </span><span style=color:#3e999f>= </span><span style=color:#f07219>False
+</span><span>        </span><span style=color:#8e908c># обрабатываем нажатые клавиши
+</span><span>        </span><span style=color:#8959a8>for </span><span>(index, key) </span><span style=color:#8959a8>in </span><span style=color:#4271ae>enumerate(key_list)</span><span>:
+</span><span>            </span><span style=color:#8e908c># если клавиша нажата
+</span><span>            </span><span style=color:#8959a8>if </span><span>key_dict[key] </span><span style=color:#3e999f>== </span><span style=color:#f07219>True</span><span>:
+</span><span>                </span><span style=color:#8e908c># то выводим звук на устройство
+</span><span>                </span><span style=color:#4271ae>stream.</span><span style=color:#c82728>write</span><span style=color:#4271ae>(tones[index])
+</span><span>    </span><span style=color:#8e908c># закрываем окно
+</span><span>    </span><span style=color:#4271ae>pygame.</span><span style=color:#c82728>quit</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># останавливаем устройство
+</span><span>    </span><span style=color:#4271ae>stream.</span><span style=color:#c82728>stop_stream</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># завершаем работу PyAudio
+</span><span>    </span><span style=color:#4271ae>stream.</span><span style=color:#c82728>close</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#4271ae>p.</span><span style=color:#c82728>terminate</span><span style=color:#4271ae>()
+</span></code></pre><p>Вот и всё. Наш минимальный синтезатор готов!<h1 id=poleznye-ssylki>Полезные ссылки</h1><p>[1] [Предыдущий пост]({% post_url 2016-09-07-sound-generator-for-morse %})<p>[2] <a href=https://gist.github.com/FreeCX/e463229415c87e6aa1e47e6ea67be1de>Исходный код с модификациями</a><p>[3] Документация по <a href=https://people.csail.mit.edu/hubert/pyaudio/docs/>PyAudio</a><p>[4] Документация по <a href=http://www.pygame.org/docs/>pygame</a><p>[5] <a href=https://habrahabr.ru/post/348036/>Программный синтез звука на ранних персональных компьютерах #1</a><p>[6] <a href=https://habrahabr.ru/post/348192/>Программный синтез звука на ранних персональных компьютерах #2</a></article><div class=back><a href=https://freecx.github.io/>Назад</a></div><div class=footer><span>Также читайте <a title="ты сам сломал ссылку, так что ничего личного" href=https://antoniii.github.io/> <s>antoniii</s> </a> <a href=https://citrux.github.io/>citrux</a> <a href=https://sputnikas.github.io/>sputnikas</a> </span></div><script>let msg=` А спонсор статей в моём блоге -- моя лень -- спонсор статей.`;[`=`.repeat(msg.length+ 1),msg,`=`.repeat(msg.length+ 1)].forEach(a=>console.warn(a))</script>
