@@ -1,0 +1,205 @@
+<!doctype html><html lang=ru><head><meta charset=utf-8><meta content="IE=edge" http-equiv=X-UA-Compatible><meta content="width=device-width,initial-scale=1" name=viewport><title>Считаем числа Фибоначчи с помощью больших чисел</title><meta content="Кодерный понедельник" name=description><meta content=https://freecx.github.io/touch-icon.png property=og:image><link href=https://code.cdn.mozilla.net/fonts/fira.css rel=stylesheet><link href=https://freecx.github.io/favicon.png rel=icon><link href=https://freecx.github.io/touch-icon.png rel=apple-touch-icon><link href=https://freecx.github.io/main.css rel=stylesheet><link href=https://freecx.github.io/syntax.css rel=stylesheet><body><aside class=logo><a href=https://github.com/FreeCX> <img class=gravatar src=https://freecx.github.io/avatar.png> </a><span class=logo-prompt>Я на github</span></aside><article><div class=center><h1>Считаем числа Фибоначчи с помощью больших чисел</h1><time>22 February 2020</time></div><div class=divider></div><p>Никто не ждал, а я вернулся!<p>Наверное уж подумали что только через пару лет что-нибудь напишу, но я же не <a href=https://citrux.github.io/>этот товарищ</a>.<p>Не будем тянуть кота за хвост и начнём!<h1 id=postanovka-zadachi>Постановка задачи</h1><p>Задача проста как <em>'2' + 2 = 22</em>. Нужно всего-то посчитать <em>100_000</em> число последовательности Фибоначчи, делов-то!<p>Если кто-то забыл, то вот основная формула для расчёта<p><img alt="Fibonachi Sequence" src=https://latex.codecogs.com/gif.download?F_n%20%3D%20F_%7Bn-1%7D%20+%20F_%7Bn-2%7D><p>Мы как всегда будем хитрить и писать с некоторыми оптимизациями.<pre style=color:#111;background-color:#f9f9f9><code><span>－ А почему?
+</span><span>－ А почему бы и нет?
+</span><span>
+</span><span>(c) Кто-то
+</span></code></pre><p>Но начнём сначала с написания функционала для расчёта больших чисел. Как-никак это самое главное!<p>Писать как всегда будем на <em>rust</em>, т.к. я давно что-то его не использовал, да и нравиться мне этот язык!<h1 id=realizatsiia-bol-shikh-chisel>Реализация больших чисел</h1><p>Давайте сначала подумаем как мы будем представлять числа в памяти... Подумали? Молодцы!<p>Для простоты реализации числа будем укладывать в вектор в обратном порядке. Далее вы поймёте почему именно в обратном.<p>Т.е. число <em>852_493_284_923_849_834_982</em> в векторе будет выглядеть как-то так:<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>let</span><span> a </span><span style=color:#3e999f>= </span><span>vec![</span><span style=color:#f07219>2</span><span>, </span><span style=color:#f07219>8</span><span>, </span><span style=color:#f07219>9</span><span>, </span><span style=color:#f07219>4</span><span>, </span><span style=color:#f07219>3</span><span>, </span><span style=color:#f07219>8</span><span>, </span><span style=color:#f07219>9</span><span>, </span><span style=color:#f07219>4</span><span>, </span><span style=color:#f07219>8</span><span>, </span><span style=color:#f07219>3</span><span>, </span><span style=color:#f07219>2</span><span>, </span><span style=color:#f07219>9</span><span>, </span><span style=color:#f07219>4</span><span>, </span><span style=color:#f07219>8</span><span>, </span><span style=color:#f07219>2</span><span>, </span><span style=color:#f07219>3</span><span>, </span><span style=color:#f07219>9</span><span>, </span><span style=color:#f07219>4</span><span>, </span><span style=color:#f07219>2</span><span>, </span><span style=color:#f07219>5</span><span>, </span><span style=color:#f07219>8</span><span>];
+</span></code></pre><p>Для этого нам нужна некоторая структура + реализуем макрос с помощью которого будет легко задавать числа.<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span>#[</span><span style=color:#c82728>derive</span><span>(Clone)]
+</span><span style=color:#8959a8>struct </span><span>BigUInt {
+</span><span>    </span><span style=color:#c82728>digit</span><span>: </span><span style=color:#c99e00>Vec</span><span><</span><span style=color:#8959a8>u8</span><span>>,
+</span><span>}
+</span><span>
+</span><span style=color:#4271ae>macro_rules! </span><span>big_vec {
+</span><span>    (</span><span style=color:#3e999f>$</span><span>(</span><span style=color:#f07219>$x</span><span>:</span><span style=color:#8959a8>tt</span><span>)</span><span style=color:#3e999f>*</span><span>) </span><span style=color:#3e999f>=> </span><span>{
+</span><span>        {
+</span><span>            </span><span style=color:#8e908c>// соберём все термы в другой макрос
+</span><span>            </span><span style=color:#8959a8>let mut</span><span> value </span><span style=color:#3e999f>= </span><span>vec![</span><span style=color:#3e999f>$</span><span>(</span><span style=color:#c82728>$x</span><span>)</span><span style=color:#3e999f>*</span><span>];
+</span><span>            </span><span style=color:#8e908c>// перевернём массив
+</span><span>            value.</span><span style=color:#4271ae>reverse</span><span>();
+</span><span>            </span><span style=color:#8e908c>// и инициализируем наше большое число
+</span><span>            BigUInt::from_vec(value)
+</span><span>        }
+</span><span>    }
+</span><span>}
+</span></code></pre><p>Вы наверное заметили <em>BigUInt::from_vec</em>, которая у нас не определена. Давайте исправим эту оплошность!<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>impl </span><span>BigUInt {
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>from_vec</span><span>&LTT: </span><span style=color:#c99e00>Into</span><span><</span><span style=color:#c99e00>Vec</span><span><</span><span style=color:#8959a8>u8</span><span>>>>(</span><span style=color:#f07219>digit</span><span>: T) -> BigUInt {
+</span><span>        </span><span style=color:#8e908c>// ничего сложного, просто наш T должен реализовывать трейт Into преобразующий digit в вектор
+</span><span>        BigUInt {
+</span><span>            digit: digit.</span><span style=color:#4271ae>into</span><span>(),
+</span><span>        }
+</span><span>    }
+</span><span>}
+</span></code></pre><p>Теперь перейдём к самому интересному и напишем реализацию оператора сложения.<p>Всё достаточно просто реализуется в два шага:<ul><li>выравнить два числа, чтобы количество элементов было одинаково<li>пройтись по всем элементам и сложить с учётом переноса</ul><p>Сначала напишем функцию для выравнивания наших больших чисел.<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>fn </span><span style=color:#4271ae>align</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>n</span><span>: </span><span style=color:#8959a8>usize</span><span>) {
+</span><span>    </span><span style=color:#8e908c>// получаем длину нашего вектора
+</span><span>    </span><span style=color:#8959a8>let</span><span> curr_size </span><span style=color:#3e999f>= </span><span style=color:#c82728>self</span><span>.digit.</span><span style=color:#4271ae>len</span><span>();
+</span><span>    </span><span style=color:#8e908c>// если меньше необходимой длины, то
+</span><span>    </span><span style=color:#8959a8>if</span><span> curr_size </span><span style=color:#3e999f><</span><span> n {
+</span><span>        </span><span style=color:#8e908c>// инициализируем вектор с нулями длины `n - curr_size`
+</span><span>        </span><span style=color:#8959a8>let mut</span><span> tmp </span><span style=color:#3e999f>= </span><span>vec![</span><span style=color:#f07219>0</span><span>; n </span><span style=color:#3e999f>-</span><span> curr_size];
+</span><span>        </span><span style=color:#8e908c>// и добавляем в конец нашего вектора
+</span><span>        </span><span style=color:#c82728>self</span><span>.digit.</span><span style=color:#4271ae>append</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut</span><span> tmp);
+</span><span>    }
+</span><span>}
+</span></code></pre><p>Не забываем что этот метод находится в блоке <em>impl BigUInt</em>.<p>Теперь перейдём к оператору сложения<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>use </span><span>std::ops::Add;
+</span><span>
+</span><span style=color:#8959a8>impl </span><span>Add </span><span style=color:#8959a8>for </span><span>BigUInt {
+</span><span>    </span><span style=color:#8959a8>type </span><span>Output </span><span style=color:#3e999f>= </span><span style=color:#8959a8>Self</span><span>;
+</span><span>
+</span><span>    </span><span style=color:#8e908c>// не забываем про mut, т.к. функция align изменяет наши значения
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>add</span><span>(</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>, </span><span style=color:#8959a8>mut </span><span style=color:#f07219>other</span><span>: </span><span style=color:#8959a8>Self</span><span>) -> </span><span style=color:#8959a8>Self </span><span>{
+</span><span>        </span><span style=color:#8e908c>// результирующий вектор
+</span><span>        </span><span style=color:#8959a8>let mut</span><span> value: </span><span style=color:#c99e00>Vec</span><span><</span><span style=color:#8959a8>u8</span><span>> </span><span style=color:#3e999f>= </span><span style=color:#c99e00>Vec</span><span>::new();
+</span><span>        </span><span style=color:#8e908c>// значение переноса
+</span><span>        </span><span style=color:#8959a8>let mut</span><span> carry </span><span style=color:#3e999f>= </span><span style=color:#f07219>0</span><span>;
+</span><span>
+</span><span>        </span><span style=color:#8e908c>// выравниваем вектора по большему
+</span><span>        </span><span style=color:#8959a8>let</span><span> m_len </span><span style=color:#3e999f>= </span><span style=color:#c82728>self</span><span>.digit.</span><span style=color:#4271ae>len</span><span>().</span><span style=color:#4271ae>max</span><span>(other.digit.</span><span style=color:#4271ae>len</span><span>());
+</span><span>        </span><span style=color:#c82728>self</span><span>.</span><span style=color:#4271ae>align</span><span>(m_len);
+</span><span>        other.</span><span style=color:#4271ae>align</span><span>(m_len);
+</span><span>
+</span><span>        </span><span style=color:#8e908c>// складываем значения с помощью упаковки двух итераторов
+</span><span>        </span><span style=color:#8959a8>for </span><span>(a, b) </span><span style=color:#3e999f>in </span><span style=color:#c82728>self</span><span>.digit.</span><span style=color:#4271ae>iter</span><span>().</span><span style=color:#4271ae>zip</span><span>(other.digit.</span><span style=color:#4271ae>iter</span><span>()) {
+</span><span>            </span><span style=color:#8e908c>// сумма двух цифр + перенос
+</span><span>            carry </span><span style=color:#3e999f>+=</span><span> a </span><span style=color:#3e999f>+</span><span> b;
+</span><span>            </span><span style=color:#8e908c>// добавляем в вектор только остаток от деления
+</span><span>            value.</span><span style=color:#4271ae>push</span><span>(carry </span><span style=color:#3e999f>% </span><span style=color:#f07219>10</span><span>);
+</span><span>            </span><span style=color:#8e908c>// а перенос идёт дальше
+</span><span>            carry </span><span style=color:#3e999f>/= </span><span style=color:#f07219>10</span><span>;
+</span><span>        }
+</span><span>        </span><span style=color:#8e908c>// добавляем значение переноса, если он не ноль
+</span><span>        </span><span style=color:#8959a8>if</span><span> carry </span><span style=color:#3e999f>!= </span><span style=color:#f07219>0 </span><span>{
+</span><span>            value.</span><span style=color:#4271ae>push</span><span>(carry);
+</span><span>        }
+</span><span>
+</span><span>        </span><span style=color:#8e908c>// Ура, готово!
+</span><span>        BigUInt::from_vec(value)
+</span><span>    }
+</span><span>}
+</span></code></pre><p>Я знаю что это не лучший вариант, но он прост в реализации и понятен.<p>Вроде всё готово! Так давайте сложим два больших числа!<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>fn </span><span style=color:#4271ae>main</span><span>() {
+</span><span>    </span><span style=color:#8959a8>let</span><span> a </span><span style=color:#3e999f>= </span><span>big_vec![</span><span style=color:#f07219>4</span><span>, </span><span style=color:#f07219>5</span><span>, </span><span style=color:#f07219>9</span><span>, </span><span style=color:#f07219>4</span><span>, </span><span style=color:#f07219>5</span><span>, </span><span style=color:#f07219>7</span><span>, </span><span style=color:#f07219>3</span><span>, </span><span style=color:#f07219>9</span><span>, </span><span style=color:#f07219>5</span><span>, </span><span style=color:#f07219>3</span><span>, </span><span style=color:#f07219>9</span><span>, </span><span style=color:#f07219>5</span><span>, </span><span style=color:#f07219>9</span><span>, </span><span style=color:#f07219>4</span><span>, </span><span style=color:#f07219>5</span><span>, </span><span style=color:#f07219>2</span><span>, </span><span style=color:#f07219>4</span><span>, </span><span style=color:#f07219>4</span><span>, </span><span style=color:#f07219>9</span><span>, </span><span style=color:#f07219>3</span><span>, </span><span style=color:#f07219>7</span><span>, </span><span style=color:#f07219>4</span><span>, </span><span style=color:#f07219>9</span><span>];
+</span><span>    </span><span style=color:#8959a8>let</span><span> b </span><span style=color:#3e999f>= </span><span>big_vec![</span><span style=color:#f07219>2</span><span>, </span><span style=color:#f07219>3</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>2</span><span>, </span><span style=color:#f07219>4</span><span>, </span><span style=color:#f07219>4</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>7</span><span>, </span><span style=color:#f07219>3</span><span>, </span><span style=color:#f07219>5</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>9</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>5</span><span>, </span><span style=color:#f07219>5</span><span>, </span><span style=color:#f07219>1</span><span>];
+</span><span>    println!(</span><span style=color:#839c00>"a = </span><span>{}</span><span style=color:#839c00>"</span><span>, a);
+</span><span>    println!(</span><span style=color:#839c00>"b = </span><span>{}</span><span style=color:#839c00>"</span><span>, b);
+</span><span>    </span><span style=color:#8959a8>let</span><span> c </span><span style=color:#3e999f>=</span><span> a </span><span style=color:#3e999f>+</span><span> b;
+</span><span>    println!(</span><span style=color:#839c00>"c = </span><span>{}</span><span style=color:#839c00>"</span><span>, c);
+</span><span>}
+</span></code></pre><p>А теперь скомпилируем и запустим<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#3e999f>$</span><span> rustc demo.rs
+</span><span>error[E0277]: `BigUInt` doesn</span><span style=color:#8959a8>'t</span><span> implement `std::fmt::Display`
+</span><span>  </span><span style=color:#3e999f>-</span><span>-> demo.rs:</span><span style=color:#f07219>79</span><span>:</span><span style=color:#f07219>24
+</span><span>   </span><span style=color:#3e999f>|
+</span><span style=color:#f07219>79 </span><span style=color:#3e999f>|     </span><span>println!(</span><span style=color:#839c00>"a = </span><span>{}</span><span style=color:#839c00>"</span><span>, a);
+</span><span>   |                        ^ `BigUInt` cannot be formatted with the default formatter
+</span><span>   </span><span style=color:#3e999f>|
+</span><span>   </span><span style=color:#3e999f>=</span><span> help: the </span><span style=color:#8959a8>trait</span><span> `std::fmt::Display` is not implemented </span><span style=color:#8959a8>for</span><span> `BigUInt`
+</span><span>   </span><span style=color:#3e999f>=</span><span> note: </span><span style=color:#3e999f>in</span><span> format strings you may be able to </span><span style=color:#8959a8>use</span><span> `{:</span><span style=color:#3e999f>?</span><span>}` (or {:</span><span style=color:#3e999f>#?</span><span>} </span><span style=color:#8959a8>for</span><span> pretty</span><span style=color:#3e999f>-</span><span>print) instead
+</span><span>   </span><span style=color:#3e999f>=</span><span> note: required by `std::fmt::Display::fmt`
+</span><span>
+</span><span>error[E0277]: `BigUInt` doesn</span><span style=color:#8959a8>'t</span><span> implement `std::fmt::Display`
+</span><span>  </span><span style=color:#3e999f>-</span><span>-> demo.rs:</span><span style=color:#f07219>80</span><span>:</span><span style=color:#f07219>24
+</span><span>   </span><span style=color:#3e999f>|
+</span><span style=color:#f07219>80 </span><span style=color:#3e999f>|     </span><span>println!(</span><span style=color:#839c00>"b = </span><span>{}</span><span style=color:#839c00>"</span><span>, b);
+</span><span>   |                        ^ `BigUInt` cannot be formatted with the default formatter
+</span><span>   </span><span style=color:#3e999f>|
+</span><span>   </span><span style=color:#3e999f>=</span><span> help: the </span><span style=color:#8959a8>trait</span><span> `std::fmt::Display` is not implemented </span><span style=color:#8959a8>for</span><span> `BigUInt`
+</span><span>   </span><span style=color:#3e999f>=</span><span> note: </span><span style=color:#3e999f>in</span><span> format strings you may be able to </span><span style=color:#8959a8>use</span><span> `{:</span><span style=color:#3e999f>?</span><span>}` (or {:</span><span style=color:#3e999f>#?</span><span>} </span><span style=color:#8959a8>for</span><span> pretty</span><span style=color:#3e999f>-</span><span>print) instead
+</span><span>   </span><span style=color:#3e999f>=</span><span> note: required by `std::fmt::Display::fmt`
+</span><span>
+</span><span>error[E0277]: `BigUInt` doesn</span><span style=color:#8959a8>'t</span><span> implement `std::fmt::Display`
+</span><span>  </span><span style=color:#3e999f>-</span><span>-> demo.rs:</span><span style=color:#f07219>82</span><span>:</span><span style=color:#f07219>24
+</span><span>   </span><span style=color:#3e999f>|
+</span><span style=color:#f07219>82 </span><span style=color:#3e999f>|     </span><span>println!(</span><span style=color:#839c00>"c = </span><span>{}</span><span style=color:#839c00>"</span><span>, c);
+</span><span>   |                        ^ `BigUInt` cannot be formatted with the default formatter
+</span><span>   </span><span style=color:#3e999f>|
+</span><span>   </span><span style=color:#3e999f>=</span><span> help: the </span><span style=color:#8959a8>trait</span><span> `std::fmt::Display` is not implemented </span><span style=color:#8959a8>for</span><span> `BigUInt`
+</span><span>   </span><span style=color:#3e999f>=</span><span> note: </span><span style=color:#3e999f>in</span><span> format strings you may be able to </span><span style=color:#8959a8>use</span><span> `{:</span><span style=color:#3e999f>?</span><span>}` (or {:</span><span style=color:#3e999f>#?</span><span>} </span><span style=color:#8959a8>for</span><span> pretty</span><span style=color:#3e999f>-</span><span>print) instead
+</span><span>   </span><span style=color:#3e999f>=</span><span> note: required by `std::fmt::Display::fmt`
+</span><span>
+</span><span>error: aborting due to </span><span style=color:#f07219>3</span><span> previous errors
+</span><span>
+</span><span>For more information about this error, try `rustc </span><span style=color:#3e999f>--</span><span>explain E0277`.
+</span></code></pre><p><a href=https://coub.com/view/shv6v>Ой-ёй</a>, кто-то забыл реализовать трейт <em>Display</em> для нашего типа.<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>use </span><span>std::fmt;
+</span><span>
+</span><span style=color:#8959a8>impl </span><span>fmt::Display </span><span style=color:#8959a8>for </span><span>BigUInt {
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>fmt</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>f</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut </span><span>fmt::Formatter<'</span><span style=color:#3e999f>_</span><span>>) -> fmt::Result {
+</span><span>        write!(
+</span><span>            f,
+</span><span>            </span><span style=color:#839c00>"</span><span>{}</span><span style=color:#839c00>"</span><span>,
+</span><span>            </span><span style=color:#c82728>self</span><span>.digit
+</span><span>                .</span><span style=color:#4271ae>iter</span><span>()
+</span><span>                </span><span style=color:#8e908c>// числа лежат в обратном порядке
+</span><span>                .</span><span style=color:#4271ae>rev</span><span>()
+</span><span>                </span><span style=color:#8e908c>// простое преобразование из u8 в char для цифр
+</span><span>                .</span><span style=color:#4271ae>map</span><span>(|</span><span style=color:#3e999f>&</span><span style=color:#f07219>x</span><span>| (x </span><span style=color:#3e999f>+ </span><span style=color:#f07219>0x30</span><span>) </span><span style=color:#3e999f>as </span><span style=color:#8959a8>char</span><span>)
+</span><span>                .collect::<</span><span style=color:#c99e00>String</span><span>>()
+</span><span>        )
+</span><span>    }
+</span><span>}
+</span></code></pre><p>Ну, а теперь соберём и проверим с помощью <em>python</em><pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> rustc demo.rs
+</span><span style=color:#c82728>$</span><span style=color:#4271ae> ./demo
+</span><span style=color:#c82728>a</span><span style=color:#4271ae> = 45945739539594524493749
+</span><span style=color:#c82728>b</span><span style=color:#4271ae> = 2312440735090551
+</span><span style=color:#c82728>c</span><span style=color:#4271ae> = 45945741852035259584300
+</span><span style=color:#c82728>$</span><span style=color:#4271ae> python
+</span><span style=color:#c82728>Python</span><span style=color:#4271ae> 3.8.1 (default, Jan 22 2020, 06:38:00</span><span>)
+</span><span style=color:#c82728>[GCC</span><span style=color:#4271ae> 9.2.0] on linux
+</span><span style=color:#c82728>Type </span><span style=color:#839c00>"help"</span><span style=color:#4271ae>, </span><span style=color:#839c00>"copyright"</span><span style=color:#4271ae>, </span><span style=color:#839c00>"credits"</span><span style=color:#4271ae> or </span><span style=color:#839c00>"license"</span><span style=color:#4271ae> for more information.
+</span><span style=color:#3e999f>>>></span><span> a </span><span style=color:#3e999f>= </span><span style=color:#c82728>45945739539594524493749
+</span><span style=color:#3e999f>>>></span><span> b </span><span style=color:#3e999f>= </span><span style=color:#c82728>2312440735090551
+</span><span style=color:#3e999f>>>></span><span> c </span><span style=color:#3e999f>= </span><span style=color:#c82728>45945741852035259584300
+</span><span style=color:#3e999f>>>></span><span> a </span><span style=color:#c82728>+</span><span style=color:#4271ae> b == c
+</span><span style=color:#c82728>True
+</span></code></pre><p>Вроде всё хорошо. Давайте перейдём к основной задаче.<h1 id=funktsiia-raschiot-chisel-fibonachchi>Функция расчёт чисел Фибоначчи</h1><p>Напишем наивную реализацию, а потом сделаем небольшие улучшения.<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>fn </span><span style=color:#4271ae>fib</span><span>(</span><span style=color:#f07219>n</span><span>: </span><span style=color:#8959a8>usize</span><span>) -> BigUInt {
+</span><span>    </span><span style=color:#8959a8>let mut</span><span> f0 </span><span style=color:#3e999f>= </span><span>big_vec![</span><span style=color:#f07219>0</span><span>];
+</span><span>    </span><span style=color:#8959a8>let mut</span><span> f1 </span><span style=color:#3e999f>= </span><span>big_vec![</span><span style=color:#f07219>1</span><span>];
+</span><span>    </span><span style=color:#8959a8>for </span><span style=color:#3e999f>_ in </span><span style=color:#f07219>0</span><span style=color:#3e999f>..</span><span>n {
+</span><span>        </span><span style=color:#8959a8>let</span><span> f2 </span><span style=color:#3e999f>=</span><span> f0.</span><span style=color:#4271ae>clone</span><span>() </span><span style=color:#3e999f>+</span><span> f1.</span><span style=color:#4271ae>clone</span><span>();
+</span><span>        f0 </span><span style=color:#3e999f>=</span><span> f1.</span><span style=color:#4271ae>clone</span><span>();
+</span><span>        f1 </span><span style=color:#3e999f>=</span><span> f2.</span><span style=color:#4271ae>clone</span><span>();
+</span><span>    }
+</span><span>    f0
+</span><span>}
+</span></code></pre><p>В наивной реализации сразу бросается в глаза множество <em>.clone()</em>, что не есть хорошо. Также когда мы создаём <em>f0</em> и <em>f1</em>, то мы делаем несколько ненужных операций <em>.reverse()</em>, что для <em>0</em> и <em>1</em> вообще не нужно.<p>Так давайте оптимизировать!<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8e908c>// добавим вспомогательные функции в BigUInt, чтобы не использовать big_vec!
+</span><span style=color:#8959a8>impl </span><span>BigUInt {
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>zero</span><span>() -> BigUInt {
+</span><span>        BigUInt { digit: vec![</span><span style=color:#f07219>0</span><span>] }
+</span><span>    }
+</span><span>
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>one</span><span>() -> BigUInt {
+</span><span>        BigUInt { digit: vec![</span><span style=color:#f07219>1</span><span>] }
+</span><span>    }
+</span><span>}
+</span><span>
+</span><span style=color:#8959a8>fn </span><span style=color:#4271ae>fib</span><span>(</span><span style=color:#f07219>n</span><span>: </span><span style=color:#8959a8>usize</span><span>) -> BigUInt {
+</span><span>    </span><span style=color:#8959a8>let mut</span><span> f0 </span><span style=color:#3e999f>= </span><span>BigUInt::zero();
+</span><span>    </span><span style=color:#8959a8>let mut</span><span> f1 </span><span style=color:#3e999f>= </span><span>BigUInt::one();
+</span><span>    </span><span style=color:#8959a8>for </span><span style=color:#3e999f>_ in </span><span style=color:#f07219>0</span><span style=color:#3e999f>..</span><span>n {
+</span><span>        </span><span style=color:#8e908c>// f0 нам не нужна, т.к. дальше мы её всё равно переопределяем
+</span><span>        </span><span style=color:#8959a8>let</span><span> f2 </span><span style=color:#3e999f>=</span><span> f0 </span><span style=color:#3e999f>+</span><span> f1.</span><span style=color:#4271ae>clone</span><span>();
+</span><span>        </span><span style=color:#8e908c>// спасибо за наводку из документации num-bigint
+</span><span>        </span><span style=color:#8e908c>// читай в доках, для лучшего понимания (`rustup doc --std std::mem::replace`)
+</span><span>        f0 </span><span style=color:#3e999f>= </span><span style=color:#4271ae>replace</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut</span><span> f1, f2);
+</span><span>    }
+</span><span>    f0
+</span><span>}
+</span></code></pre><p>Уже лучше! На этом наша реализация готова, но давайте используем сторонний крейт, где работа с большими числами сделана более оптимально.<h1 id=ispol-zuem-storonnii-kreit>Используем сторонний крейт</h1><p>Не будем заострять внимание на отдельных частях, а сразу "нырнём" в код, который представлен <a href=https://docs.rs/num-bigint/0.2.6/num_bigint/>в документации крейта num-bigint</a><pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>extern crate</span><span> num_bigint;
+</span><span style=color:#8959a8>extern crate</span><span> num_traits;
+</span><span>
+</span><span style=color:#8959a8>use </span><span>num_bigint::BigUint;
+</span><span style=color:#8959a8>use </span><span>num_traits::{One, Zero};
+</span><span style=color:#8959a8>use </span><span>std::mem::replace;
+</span><span>
+</span><span style=color:#8959a8>fn </span><span style=color:#4271ae>fib</span><span>(</span><span style=color:#f07219>n</span><span>: </span><span style=color:#8959a8>usize</span><span>) -> BigUint {
+</span><span>    </span><span style=color:#8e908c>// наш 0
+</span><span>    </span><span style=color:#8959a8>let mut</span><span> f0: BigUint </span><span style=color:#3e999f>= </span><span>Zero::zero();
+</span><span>    </span><span style=color:#8e908c>// и 1
+</span><span>    </span><span style=color:#8959a8>let mut</span><span> f1: BigUint </span><span style=color:#3e999f>= </span><span>One::one();
+</span><span>    </span><span style=color:#8e908c>// аналогичный цикл
+</span><span>    </span><span style=color:#8959a8>for </span><span style=color:#3e999f>_ in </span><span style=color:#f07219>0</span><span style=color:#3e999f>..</span><span>n {
+</span><span>        </span><span style=color:#8959a8>let</span><span> f2 </span><span style=color:#3e999f>=</span><span> f0 </span><span style=color:#3e999f>+ &</span><span>f1;
+</span><span>        f0 </span><span style=color:#3e999f>= </span><span style=color:#4271ae>replace</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut</span><span> f1, f2);
+</span><span>    }
+</span><span>    f0
+</span><span>}
+</span></code></pre><p>Не забудь добавить зависимости в <strong>Cargo.toml</strong><pre class=language-toml data-lang=toml style=color:#111;background-color:#f9f9f9><code class=language-toml data-lang=toml><span>[</span><span style=color:#c82728>dependencies</span><span>]
+</span><span style=color:#c82728>num-bigint </span><span>= </span><span style=color:#839c00>"*"
+</span><span style=color:#c82728>num-traits </span><span>= </span><span style=color:#839c00>"*"
+</span></code></pre><p>Вот и всё, теперь можно перейти к тестам!<h1 id=testy>Тесты</h1><p>Все приложения были собраны с флагом <em>-C opt-level=3</em>, что соответствует 3-му уровню оптимизации кода.<p>На моей машине с процессором i5-8265U приложения выполняются за следующее время:<ul><li>неоптимальная реализация: <strong>4.155387149s</strong><li>реализация с небольшой оптимизацией: <strong>3.987596324s</strong><li>оптимизация <em>inplace</em>: <strong>2.180896853s</strong> (см. файл <a href=https://gist.github.com/FreeCX/34c6c7d63afbfe1aa4ab82f3470b4b35#file-my_biguint_inplace-rs>my_biguint_inplace.rs</a>)<li>реализация через крейт <em>num-bigint</em>: <strong>176.255462ms</strong></ul><p>Информация для тех, кто захочет повторить:<ul><li>stable-x86_64-unknown-linux-gnu<li>rustc 1.41.0 (5e1a79984 2020-01-27)<li>cargo 1.41.0 (626f0f40e 2019-12-03)<li>autocfg 1.0.0<li>num-bigint 0.2.6<li>num-integer 0.1.42<li>num-traits 0.2.11</ul><p>Для более точного замера предлагаю сделать не менее 10 тестов и посчитать всякие умные метрики.<p>Мы же ограничились выбором минимального времени из 10 тестов для каждого из примеров.<p>Выводы думаю сделаете сами.<h1 id=zakliuchenie>Заключение</h1><p>Вот так просто и незатейливо... А, это уже я писал. Короче вроде ничего сложного, а у нас уже есть простая реализация больших чисел.<p>Весь исходный код доступен по <a href=https://gist.github.com/FreeCX/34c6c7d63afbfe1aa4ab82f3470b4b35>ссылке</a>. Если мне будет скучно, то я добавлю реализацию ещё на паре языков или оптимизирую текущий код.<p>На этом сегодня всё! Не страдайте фигнёй и надеюсь скоро увидимся... услышимся... учитаемся... Короче пока!<h1 id=poleznye-ssylki>Полезные ссылки</h1><p>Сегодня их не будет, т.к. я ничего не читал для реализации, а хотя...<ol><li><a href=https://docs.rs/num-bigint/0.2.6/num_bigint/>num-bigint</a></ol></article><div class=back><a href=https://freecx.github.io/>Назад</a></div><div class=footer><span>Также читайте <a title="ты сам сломал ссылку, так что ничего личного" href=https://antoniii.github.io/> <s>antoniii</s> </a> <a href=https://citrux.github.io/>citrux</a> <a href=https://sputnikas.github.io/>sputnikas</a> </span></div><script>let msg=` А спонсор статей в моём блоге -- моя лень -- спонсор статей.`;[`=`.repeat(msg.length+ 1),msg,`=`.repeat(msg.length+ 1)].forEach(a=>console.warn(a))</script>

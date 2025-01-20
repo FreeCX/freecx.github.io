@@ -1,0 +1,118 @@
+<!doctype html><html lang=ru><head><meta charset=utf-8><meta content="IE=edge" http-equiv=X-UA-Compatible><meta content="width=device-width,initial-scale=1" name=viewport><title>Немного про кодирование данных</title><meta content="Кодерный понедельник" name=description><meta content=https://freecx.github.io/touch-icon.png property=og:image><link href=https://code.cdn.mozilla.net/fonts/fira.css rel=stylesheet><link href=https://freecx.github.io/favicon.png rel=icon><link href=https://freecx.github.io/touch-icon.png rel=apple-touch-icon><link href=https://freecx.github.io/main.css rel=stylesheet><link href=https://freecx.github.io/syntax.css rel=stylesheet><body><aside class=logo><a href=https://github.com/FreeCX> <img class=gravatar src=https://freecx.github.io/avatar.png> </a><span class=logo-prompt>Я на github</span></aside><article><div class=center><h1>Немного про кодирование данных</h1><time>20 February 2021</time></div><div class=divider></div><p>Всем привет.<p>Сегодня я хочу немного рассказать про человекочитаемое кодирование данных.<p>Это не полноценная статья, да и метод не тянет на новый или выдающийся, но он довольно прост в реализации.<h1 id=ideia>Идея</h1><p>Алгоритм кодирования данных можно описать в три пункта:<ol><li>Проход по всем входным данных и преобразование каждого символа в 8 бит данных<li>Добавление паддинга в конец данных<li>Проход по всем данным и выбор по 6 бит с преобразованием по алфавиту</ol><p>Всё выглядит очень просто, что так и есть!<p>С декодированием обстоит всё так же просто. Оно реализуется обращением шагов 1-3:<ol><li>Проход по всем данным и преобразование символа в 6 бит данных<li>Удаление паддинга<li>Проход по всем данным и выбор по 8 бит с преобразованием по алфавиту</ol><p>Ничего же сложного?<h1 id=alfavit>Алфавит</h1><p>Главное требование к алфавиту — фиксированная длина в <em>2^N</em> символов, где <em>N</em> равен <em>6</em>.<p>В реализации <a href=https://github.com/FreeCX/rs-1010/blob/master/src/save.rs>сохранения состояния игры</a> я использовал следующий алфавит:<pre style=color:#111;background-color:#f9f9f9><code><span>abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+~
+</span></code></pre><p>Но в данном примере мы его изменим на вот такой:<pre style=color:#111;background-color:#f9f9f9><code><span>0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ#@
+</span></code></pre><p>В своей же реализации можете выбрать любой какой вам больше нравится.<h1 id=realizatsiia>Реализация</h1><p>Давайте в этот раз реализуем алгоритм на менее привычном языке, например на Haskell.<p>Я не мастер писать на нём, так что сильно не пинайте!<p>Определим скелет нашей программы<pre class=language-haskell data-lang=haskell style=color:#111;background-color:#f9f9f9><code class=language-haskell data-lang=haskell><span style=color:#8959a8>module </span><span>Main </span><span style=color:#8959a8>where
+</span><span>
+</span><span style=color:#8959a8>import </span><span>Text.Printf (</span><span style=color:#4271ae>printf</span><span>)
+</span><span>
+</span><span style=color:#8e908c>-- функция заглушка для кодирования сообщения
+</span><span style=color:#4271ae>encode </span><span style=color:#8959a8>:: String -> String
+</span><span>encode </span><span style=color:#3e999f>=</span><span> id
+</span><span>
+</span><span style=color:#8e908c>-- функция заглушка для декодирования сообщения
+</span><span style=color:#4271ae>decode </span><span style=color:#8959a8>:: String -> String
+</span><span>decode </span><span style=color:#3e999f>=</span><span> id
+</span><span>
+</span><span>main </span><span style=color:#3e999f>= </span><span style=color:#8959a8>do
+</span><span>    input </span><span style=color:#3e999f>&LT-</span><span> getLine
+</span><span>    </span><span style=color:#8959a8>let</span><span> encoded </span><span style=color:#3e999f>=</span><span> encode input
+</span><span>    </span><span style=color:#8959a8>let</span><span> decoded </span><span style=color:#3e999f>=</span><span> decode encoded
+</span><span>    printf </span><span style=color:#839c00>" input: `%s`</span><span style=color:#f07219>\n</span><span style=color:#839c00>encode: `%s`</span><span style=color:#f07219>\n</span><span style=color:#839c00>decode: `%s`</span><span style=color:#f07219>\n</span><span style=color:#839c00>"</span><span> input encoded decoded
+</span></code></pre><p>Тут мы просто организуем чтение строки из <em>stdin</em> и вызов функций кодирования и декодирования.<p>Для реализации основного функционала нам нужны некоторые вспомогательные функции, такие как:<ul><li>добавление паддинга<li>удаление паддинга<li>группировка элементов<li>число в массив бит<li>массив бит в число</ul><p>Давайте определим их<pre class=language-haskell data-lang=haskell style=color:#111;background-color:#f9f9f9><code class=language-haskell data-lang=haskell><span style=color:#8e908c>-- добавление паддинга до размера size
+</span><span style=color:#4271ae>sizePadding </span><span style=color:#8959a8>::</span><span> ([</span><span style=color:#c82728>a</span><span>] </span><span style=color:#8959a8>-></span><span> [</span><span style=color:#c82728>a</span><span>] </span><span style=color:#8959a8>-></span><span> [</span><span style=color:#c82728>a</span><span>]) </span><span style=color:#8959a8>-> Int -> </span><span style=color:#c82728>a </span><span style=color:#8959a8>-></span><span> [</span><span style=color:#c82728>a</span><span>] </span><span style=color:#8959a8>-></span><span> [</span><span style=color:#c82728>a</span><span>]
+</span><span>sizePadding func size value array
+</span><span>    </span><span style=color:#8e908c>-- если текущий массив больше по размеру, то это ошибка
+</span><span>    </span><span style=color:#3e999f>|</span><span> curr </span><span style=color:#3e999f>></span><span> size </span><span style=color:#3e999f>=</span><span> error </span><span style=color:#3e999f>$ </span><span style=color:#839c00>"Current size > " </span><span style=color:#3e999f>++</span><span> (show size)
+</span><span>    </span><span style=color:#8e908c>-- добиваем паддинги
+</span><span>    </span><span style=color:#3e999f>|</span><span> curr </span><span style=color:#3e999f><</span><span> size </span><span style=color:#3e999f>=</span><span> func array padding
+</span><span>    </span><span style=color:#8e908c>-- или возвращаем исходный
+</span><span>    </span><span style=color:#3e999f>|</span><span> otherwise </span><span style=color:#3e999f>=</span><span> array
+</span><span>    </span><span style=color:#8959a8>where
+</span><span>        </span><span style=color:#8e908c>-- размер входных данных
+</span><span>        curr </span><span style=color:#3e999f>=</span><span> length array
+</span><span>        </span><span style=color:#8e908c>-- размер паддинга
+</span><span>        padsize </span><span style=color:#3e999f>=</span><span> size </span><span style=color:#3e999f>-</span><span> curr
+</span><span>        </span><span style=color:#8e908c>-- сам паддинг
+</span><span>        padding </span><span style=color:#3e999f>=</span><span> take padsize </span><span style=color:#3e999f>.</span><span> repeat </span><span style=color:#3e999f>$</span><span> value
+</span><span>
+</span><span style=color:#8e908c>-- добавление паддинга до кратного modBy
+</span><span style=color:#4271ae>modPadding </span><span style=color:#8959a8>::</span><span> ([</span><span style=color:#c82728>a</span><span>] </span><span style=color:#8959a8>-></span><span> [</span><span style=color:#c82728>a</span><span>] </span><span style=color:#8959a8>-></span><span> [</span><span style=color:#c82728>a</span><span>]) </span><span style=color:#8959a8>-> Int -> </span><span style=color:#c82728>a </span><span style=color:#8959a8>-></span><span> [</span><span style=color:#c82728>a</span><span>] </span><span style=color:#8959a8>-></span><span> [</span><span style=color:#c82728>a</span><span>]
+</span><span>modPadding func modBy value array </span><span style=color:#3e999f>=</span><span> func array padding
+</span><span>    </span><span style=color:#8959a8>where
+</span><span>        </span><span style=color:#8e908c>-- размер входных данных
+</span><span>        modv </span><span style=color:#3e999f>=</span><span> (length array) </span><span style=color:#3e999f>`mod`</span><span> modBy
+</span><span>        </span><span style=color:#8e908c>-- размер паддинга
+</span><span>        padsize </span><span style=color:#3e999f>= </span><span style=color:#8959a8>if</span><span> modv </span><span style=color:#3e999f>== </span><span style=color:#f07219>0 </span><span style=color:#8959a8>then </span><span style=color:#f07219>0 </span><span style=color:#8959a8>else</span><span> modBy </span><span style=color:#3e999f>-</span><span> modv
+</span><span>        </span><span style=color:#8e908c>-- паддинг
+</span><span>        padding </span><span style=color:#3e999f>=</span><span> take padsize </span><span style=color:#3e999f>.</span><span> repeat </span><span style=color:#3e999f>$</span><span> value
+</span><span>
+</span><span style=color:#8e908c>-- удаление паддинга с конца массива
+</span><span style=color:#4271ae>removePadding </span><span style=color:#8959a8>:: Int -></span><span> [</span><span style=color:#8959a8>Int</span><span>] </span><span style=color:#8959a8>-></span><span> [</span><span style=color:#8959a8>Int</span><span>]
+</span><span>removePadding size arr </span><span style=color:#3e999f>=</span><span> take wop arr
+</span><span>    </span><span style=color:#8959a8>where
+</span><span>        </span><span style=color:#8e908c>-- длина входного массива
+</span><span>        len </span><span style=color:#3e999f>=</span><span> length arr
+</span><span>        </span><span style=color:#8e908c>-- количество возвращаемых элементов
+</span><span>        wop </span><span style=color:#3e999f>=</span><span> len </span><span style=color:#3e999f>-</span><span> (len </span><span style=color:#3e999f>`mod`</span><span> size)
+</span><span>
+</span><span style=color:#8e908c>-- группировка данных по n элементов
+</span><span style=color:#4271ae>group </span><span style=color:#8959a8>:: Int -></span><span> [</span><span style=color:#8959a8>Int</span><span>] </span><span style=color:#8959a8>-></span><span> [[</span><span style=color:#8959a8>Int</span><span>]]
+</span><span>group _ </span><span style=color:#f07219>[] </span><span style=color:#3e999f>= </span><span style=color:#f07219>[]
+</span><span>group n l
+</span><span>    </span><span style=color:#3e999f>|</span><span> n </span><span style=color:#3e999f>> </span><span style=color:#f07219>0 </span><span style=color:#3e999f>=</span><span> (take n l) </span><span style=color:#3e999f>:</span><span> (group n </span><span style=color:#3e999f>$</span><span> drop n l)
+</span><span>    </span><span style=color:#8e908c>-- ноль или отрицательное число элементов недопустимо
+</span><span>    </span><span style=color:#3e999f>|</span><span> otherwise </span><span style=color:#3e999f>=</span><span> error </span><span style=color:#839c00>"Negative or zero n"
+</span><span>
+</span><span style=color:#8e908c>-- преобразование массива битов в число
+</span><span style=color:#4271ae>asInt </span><span style=color:#8959a8>::</span><span> [</span><span style=color:#8959a8>Int</span><span>] </span><span style=color:#8959a8>-> Int
+</span><span>asInt </span><span style=color:#3e999f>=</span><span> foldl (</span><span style=color:#3e999f>\</span><span>a b </span><span style=color:#3e999f>-></span><span> (a * </span><span style=color:#f07219>2</span><span>) </span><span style=color:#3e999f>+</span><span> b) </span><span style=color:#f07219>0
+</span><span>
+</span><span style=color:#8e908c>-- преобразование int в бинарное представление
+</span><span style=color:#4271ae>binary </span><span style=color:#8959a8>:: Int -></span><span> [</span><span style=color:#8959a8>Int</span><span>]
+</span><span>binary </span><span style=color:#3e999f>=</span><span> convert </span><span style=color:#f07219>[]
+</span><span>    </span><span style=color:#8959a8>where
+</span><span>        </span><span style=color:#8e908c>-- готово
+</span><span>        convert arr </span><span style=color:#f07219>0 </span><span style=color:#3e999f>=</span><span> arr
+</span><span>        </span><span style=color:#8e908c>-- в процессе преобразования
+</span><span>        convert arr val </span><span style=color:#3e999f>=</span><span> convert ((</span><span style=color:#3e999f>:</span><span> arr) </span><span style=color:#3e999f>.</span><span> (</span><span style=color:#3e999f>`mod` </span><span style=color:#f07219>2</span><span>) </span><span style=color:#3e999f>$</span><span> val) (val </span><span style=color:#3e999f>`div` </span><span style=color:#f07219>2</span><span>)
+</span><span>
+</span><span style=color:#8e908c>-- вспомогательная функция преобразование строки в массив int`ов
+</span><span style=color:#4271ae>toIntMap </span><span style=color:#8959a8>::</span><span> (</span><span style=color:#8959a8>Char -></span><span> [</span><span style=color:#8959a8>Int</span><span>]) </span><span style=color:#8959a8>-> String -></span><span> [</span><span style=color:#8959a8>Int</span><span>]
+</span><span>toIntMap func </span><span style=color:#3e999f>=</span><span> foldr </span><span style=color:#4271ae>(++) </span><span style=color:#f07219>[] </span><span style=color:#3e999f>.</span><span> map func
+</span></code></pre><p>Теперь можно перейти к самому главному<pre class=language-haskell data-lang=haskell style=color:#111;background-color:#f9f9f9><code class=language-haskell data-lang=haskell><span style=color:#8959a8>import </span><span>Data.Maybe (</span><span style=color:#4271ae>fromJust</span><span>)
+</span><span style=color:#8959a8>import </span><span>Data.List (</span><span style=color:#4271ae>elemIndex</span><span>)
+</span><span style=color:#8959a8>import </span><span>Data.Char (</span><span style=color:#4271ae>ord</span><span>, </span><span style=color:#4271ae>chr</span><span>)
+</span><span>
+</span><span style=color:#8e908c>-- наш алфавит
+</span><span>alphabet </span><span style=color:#3e999f>= </span><span style=color:#839c00>"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ#@"
+</span><span>
+</span><span style=color:#8e908c>-- кодирование текста
+</span><span style=color:#4271ae>encode </span><span style=color:#8959a8>:: String -> String
+</span><span>encode </span><span style=color:#3e999f>=</span><span> asAlphabet </span><span style=color:#3e999f>.</span><span> group </span><span style=color:#f07219>6 </span><span style=color:#3e999f>.</span><span> modTail6 </span><span style=color:#3e999f>.</span><span> toIntMap asArray8
+</span><span>    </span><span style=color:#8959a8>where
+</span><span>        </span><span style=color:#8e908c>-- преобразование индекса в символ алфавита
+</span><span>        asAlphabet </span><span style=color:#3e999f>=</span><span> map ((alphabet </span><span style=color:#3e999f>!!</span><span>) </span><span style=color:#3e999f>.</span><span> asInt)
+</span><span>        </span><span style=color:#8e908c>-- добавление паддинга в начало
+</span><span>        headPad8 </span><span style=color:#3e999f>=</span><span> sizePadding (</span><span style=color:#3e999f>\</span><span>a b </span><span style=color:#3e999f>-></span><span> b </span><span style=color:#3e999f>++</span><span> a) </span><span style=color:#f07219>8 0
+</span><span>        </span><span style=color:#8e908c>-- добавление паддинга в конце
+</span><span>        modTail6 </span><span style=color:#3e999f>=</span><span> modPadding </span><span style=color:#4271ae>(++) </span><span style=color:#f07219>6 0
+</span><span>        </span><span style=color:#8e908c>-- строка в набор бит
+</span><span>        asArray8 </span><span style=color:#3e999f>=</span><span> headPad8 </span><span style=color:#3e999f>.</span><span> binary </span><span style=color:#3e999f>.</span><span> ord
+</span><span>
+</span><span style=color:#8e908c>-- декодирование
+</span><span style=color:#4271ae>decode </span><span style=color:#8959a8>:: String -> String
+</span><span>decode </span><span style=color:#3e999f>=</span><span> asAlphabet </span><span style=color:#3e999f>.</span><span> group </span><span style=color:#f07219>8 </span><span style=color:#3e999f>.</span><span> removePadding </span><span style=color:#f07219>8 </span><span style=color:#3e999f>.</span><span> toIntMap asArray6
+</span><span>    </span><span style=color:#8959a8>where
+</span><span>        </span><span style=color:#8e908c>-- преобразование индекса в символ
+</span><span>        asAlphabet </span><span style=color:#3e999f>=</span><span> map (chr </span><span style=color:#3e999f>.</span><span> asInt)
+</span><span>        </span><span style=color:#8e908c>-- добавление паддинга в начало
+</span><span>        headPad6 </span><span style=color:#3e999f>=</span><span> sizePadding (</span><span style=color:#3e999f>\</span><span>a b </span><span style=color:#3e999f>-></span><span> b </span><span style=color:#3e999f>++</span><span> a) </span><span style=color:#f07219>6 0
+</span><span>        </span><span style=color:#8e908c>-- строка в набор бит
+</span><span>        asArray6 </span><span style=color:#3e999f>=</span><span> headPad6 </span><span style=color:#3e999f>.</span><span> binary </span><span style=color:#3e999f>.</span><span> fromJust </span><span style=color:#3e999f>.</span><span> (</span><span style=color:#3e999f>`elemIndex`</span><span> alphabet)
+</span></code></pre><h1 id=kak-eto-rabotaet>Как это работает?</h1><p>Для тех кто не знаком с Haskell это наверное выглядит очень странно.<p>Поэтому давайте рассмотрим последовательно что делает функция <strong>encode</strong> на примере строки из одного символа <strong>"h"</strong>.<ol><li><strong>asArray8</strong> (<strong>toIntMap</strong> проходит по всей строке и собирает все эти биты в один массив)</ol><pre style=color:#111;background-color:#f9f9f9><code><span>#   ord     binary              headPad8
+</span><span>"h" --> 104 --> [1,1,0,1,0,0,0] --> [0,1,1,0,1,0,0,0]
+</span></code></pre><ol start=2><li><strong>modTail6</strong> (добиваем паддингом для кратности 6)</ol><pre style=color:#111;background-color:#f9f9f9><code><span>[0,1,1,0,1,0,0,0] --> [0,1,1,0,1,0,0,0,0,0,0,0]
+</span></code></pre><ol start=3><li><strong>group 6</strong> (группируем по 6)</ol><pre style=color:#111;background-color:#f9f9f9><code><span>[0,1,1,0,1,0,0,0,0,0,0,0] --> [[0,1,1,0,1,0],[0,0,0,0,0,0]]
+</span></code></pre><ol start=4><li><strong>asAlphabet</strong> (преобразуем в символы)</ol><pre style=color:#111;background-color:#f9f9f9><code><span>#           asInt    alphabet !!
+</span><span>[0,1,1,0,1,0] --> 26 --> 'q'
+</span><span>[0,0,0,0,0,0] --> 0  --> '0'
+</span></code></pre><p>Так как <strong>String</strong> это синоним <strong>[Char]</strong>, то на выходе мы автоматически получим строку <strong>"q0"</strong>.<p>Возможны сейчас стало понятно почему я цифры в алфавите поставил в самое начало :)<h1 id=zakliuchenie>Заключение</h1><p>Полный исходный код данной программы можно забрать <a href=https://gist.github.com/FreeCX/e91d7b739a1bde033037f7ff153045e9>здесь</a>.<p>Данный метод я использовал в <a href=https://github.com/FreeCX/rs-1010>rs-1010</a> для <a href=https://github.com/FreeCX/rs-1010/blob/master/src/save.rs>сохранения состояния игры</a>.<p>Данную реализацию ещё можно сильно улучшить убрав создание массива из битов, но это уже будет по сути реализация алгоритма <a href=https://en.wikipedia.org/wiki/Base64>base64</a> просто с модифицированным алфавитом.<p>На это закончим на сегодня.<h1 id=chto-pochitat>Что почитать</h1><ol><li><a href=https://en.wikipedia.org/wiki/Base64>base64</a><li><a href=https://habr.com/ru/post/537776/>Как работает алгоритм генерации паролей Castlevania III</a><li><a href=https://habr.com/ru/post/304160/>Генерирование паролей для Super Castlevania IV и Rock n' Roll Racing</a></ol></article><div class=back><a href=https://freecx.github.io/>Назад</a></div><div class=footer><span>Также читайте <a title="ты сам сломал ссылку, так что ничего личного" href=https://antoniii.github.io/> <s>antoniii</s> </a> <a href=https://citrux.github.io/>citrux</a> <a href=https://sputnikas.github.io/>sputnikas</a> </span></div><script>let msg=` А спонсор статей в моём блоге -- моя лень -- спонсор статей.`;[`=`.repeat(msg.length+ 1),msg,`=`.repeat(msg.length+ 1)].forEach(a=>console.warn(a))</script>

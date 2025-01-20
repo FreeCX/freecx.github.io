@@ -1,0 +1,315 @@
+<!doctype html><html lang=ru><head><meta charset=utf-8><meta content="IE=edge" http-equiv=X-UA-Compatible><meta content="width=device-width,initial-scale=1" name=viewport><title>Сказ о 2.5D эффекте</title><meta content="Кодерный понедельник" name=description><meta content=https://freecx.github.io/touch-icon.png property=og:image><link href=https://code.cdn.mozilla.net/fonts/fira.css rel=stylesheet><link href=https://freecx.github.io/favicon.png rel=icon><link href=https://freecx.github.io/touch-icon.png rel=apple-touch-icon><link href=https://freecx.github.io/main.css rel=stylesheet><link href=https://freecx.github.io/syntax.css rel=stylesheet><body><aside class=logo><a href=https://github.com/FreeCX> <img class=gravatar src=https://freecx.github.io/avatar.png> </a><span class=logo-prompt>Я на github</span></aside><article><div class=center><h1>Сказ о 2.5D эффекте</h1><time>23 July 2020</time></div><div class=divider></div><p>Совсем недавно просматривая старые фотки наткнулся на <a href=https://github.com/FreeCX/vf-transtion/blob/master/demo/flower-01.png>две</a> <a href=https://github.com/FreeCX/vf-transtion/blob/master/demo/flower-02.png>интересные</a>.<p>Чуть позже появилась у меня идея сделать из них что-то типа параллакс эффекта, или как он там называется? Решил делать сам, т.к. просто было лень гуглить софт или видео о том как этот эффект делается.<p>За основу взял простую идею — прозрачность первой фотографии плавно уменьшается от 100% и до 0%, а у второй наоборот, от 0% до 100%.<p>Поковырял немного фотошоп, но результат меня не устроил. Яркостная составляющая итогового результата в каждом кадре была разной. Значит переходим к кодингу!<h1 id=ideia>Идея</h1><p>От идеи плавного варьирования прозрачности не будем отказываться, но возьмём за основу вот такую формулу:<p><img alt=image src=https://wikimedia.org/api/rest_v1/media/math/render/svg/c9ade261edcf6ceb558a45aa8625197e863de0aa><p>Формула для преобразования есть, остаётся только написать код который смешивает фотографии в нужных пропорциях.<p>Далее можно полученный набор изображений с помощью ffmpeg перегнать в видео.<h1 id=1-yi-blin-python>1-ый блин, python</h1><p>Сразу скажу что код не совсем тот, что был у первой реализации, но по скорости он был всё равно отстойный!<p>Для начала создадим класс <code>ffmpeg</code>, который будет ответственен за работу с ним<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>import </span><span>subprocess </span><span style=color:#8959a8>as </span><span>sp
+</span><span>
+</span><span style=color:#8e908c># плевали мы title case
+</span><span style=color:#8959a8>class </span><span style=color:#c99e00>ffmpeg</span><span>:
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>__init__</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>fps</span><span>, </span><span style=color:#f07219>output</span><span>):
+</span><span>        </span><span style=color:#c82728>self</span><span>.cmd_out </span><span style=color:#3e999f>= </span><span>[
+</span><span>            </span><span style=color:#839c00>'ffmpeg'</span><span>,
+</span><span>            </span><span style=color:#8e908c># используем pipe
+</span><span>            </span><span style=color:#839c00>'-i'</span><span>, </span><span style=color:#839c00>'-'</span><span>,
+</span><span>            </span><span style=color:#8e908c># формат входных данных
+</span><span>            </span><span style=color:#839c00>'-f'</span><span>, </span><span style=color:#839c00>'image2pipe'</span><span>,
+</span><span>            </span><span style=color:#8e908c># fps
+</span><span>            </span><span style=color:#839c00>'-r'</span><span>, </span><span style=color:#c99e00>str</span><span style=color:#4271ae>(fps)</span><span>,
+</span><span>            </span><span style=color:#8e908c># формат выходных данных
+</span><span>            </span><span style=color:#839c00>'-c:v'</span><span>, </span><span style=color:#839c00>'libx264'</span><span>,
+</span><span>            </span><span style=color:#8e908c># игнорируем существующий файл + имя выходного файла
+</span><span>            </span><span style=color:#839c00>'-y'</span><span>, </span><span style=color:#c99e00>str</span><span style=color:#4271ae>(output)
+</span><span>        ]
+</span><span>        </span><span style=color:#8e908c># создаём наш pipe
+</span><span>        </span><span style=color:#c82728>self</span><span>.pipe </span><span style=color:#3e999f>= </span><span style=color:#4271ae>sp.</span><span style=color:#c82728>Popen</span><span style=color:#4271ae>(</span><span style=color:#c82728>self</span><span style=color:#4271ae>.cmd_out, </span><span style=color:#f07219>stdin</span><span style=color:#3e999f>=</span><span style=color:#4271ae>sp.</span><span style=color:#c82728>PIPE</span><span style=color:#4271ae>)
+</span><span>
+</span><span>    </span><span style=color:#8e908c># будем функцией пропихивать картинки в pipe
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>push</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>frame</span><span>):
+</span><span>        </span><span style=color:#4271ae>frame.</span><span style=color:#c82728>save</span><span style=color:#4271ae>(</span><span style=color:#c82728>self</span><span style=color:#4271ae>.pipe.stdin, </span><span style=color:#839c00>'PNG'</span><span style=color:#4271ae>)
+</span><span>
+</span><span>    </span><span style=color:#8e908c># и при завершении закрывать pipe
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>__del__</span><span>(</span><span style=color:#f07219>self</span><span>):
+</span><span>        </span><span style=color:#c82728>self</span><span style=color:#4271ae>.pipe.stdin.</span><span style=color:#c82728>close</span><span style=color:#4271ae>()
+</span><span>        </span><span style=color:#c82728>self</span><span style=color:#4271ae>.pipe.</span><span style=color:#c82728>wait</span><span style=color:#4271ae>()
+</span><span>
+</span><span>        </span><span style=color:#8959a8>if </span><span style=color:#c82728>self</span><span>.pipe.returncode </span><span style=color:#3e999f>!= </span><span style=color:#f07219>0</span><span>:
+</span><span>            </span><span style=color:#8959a8>raise </span><span style=color:#4271ae>sp.</span><span style=color:#c82728>CalledProcessError</span><span style=color:#4271ae>(</span><span style=color:#c82728>self</span><span style=color:#4271ae>.pipe.returncode, </span><span style=color:#c82728>self</span><span style=color:#4271ae>.cmd_out)
+</span></code></pre><p>И остальной код<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>from </span><span>PIL </span><span style=color:#8959a8>import </span><span>Image, UnidentifiedImageError
+</span><span style=color:#8959a8>import </span><span>numpy </span><span style=color:#8959a8>as </span><span>np
+</span><span>
+</span><span style=color:#8e908c># загрузка фото на изи
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>load_image</span><span>(</span><span style=color:#f07219>file</span><span>):
+</span><span>    </span><span style=color:#8959a8>try</span><span>:
+</span><span>        </span><span style=color:#8959a8>return </span><span style=color:#4271ae>Image.</span><span style=color:#c82728>open</span><span style=color:#4271ae>(file)
+</span><span>    </span><span style=color:#8959a8>except </span><span>UnidentifiedImageError:
+</span><span>        </span><span style=color:#4271ae>print(</span><span style=color:#8959a8>f</span><span style=color:#839c00>'[error]: cannot open </span><span style=color:#4271ae>{file}</span><span style=color:#839c00> file'</span><span style=color:#4271ae>)
+</span><span>        </span><span style=color:#c82728>exit</span><span style=color:#4271ae>()
+</span><span>
+</span><span style=color:#8e908c># используем numpy для генерации перехода
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>alpha_range</span><span>(</span><span style=color:#f07219>start</span><span>, </span><span style=color:#f07219>stop</span><span>, </span><span style=color:#f07219>step</span><span>):
+</span><span>    v_up </span><span style=color:#3e999f>= </span><span style=color:#4271ae>np.</span><span style=color:#c82728>arange</span><span style=color:#4271ae>(start, stop </span><span style=color:#3e999f>+ </span><span style=color:#4271ae>step, step)
+</span><span>    v_down </span><span style=color:#3e999f>= </span><span style=color:#4271ae>np.</span><span style=color:#c82728>arange</span><span style=color:#4271ae>(stop, start </span><span style=color:#3e999f>- </span><span style=color:#4271ae>step, </span><span style=color:#3e999f>-</span><span style=color:#4271ae>step)
+</span><span>    </span><span style=color:#8959a8>return </span><span style=color:#c99e00>list</span><span style=color:#4271ae>(v_up) </span><span style=color:#3e999f>+ </span><span style=color:#c99e00>list</span><span style=color:#4271ae>(v_down)
+</span><span>
+</span><span style=color:#8e908c># смешивание на изи
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>blend</span><span>(</span><span style=color:#f07219>i1</span><span>, </span><span style=color:#f07219>i2</span><span>, </span><span style=color:#f07219>alpha</span><span>):
+</span><span>    </span><span style=color:#8959a8>return </span><span style=color:#4271ae>Image.</span><span style=color:#c82728>blend</span><span style=color:#4271ae>(i1, i2, alpha)
+</span><span>
+</span><span>
+</span><span style=color:#8e908c># параметры видео
+</span><span>output </span><span style=color:#3e999f>= </span><span style=color:#839c00>'render.mp4'
+</span><span>transition_time </span><span style=color:#3e999f>= </span><span style=color:#f07219>5
+</span><span>fps </span><span style=color:#3e999f>= </span><span style=color:#f07219>25
+</span><span>step </span><span style=color:#3e999f>= </span><span style=color:#f07219>2.0 </span><span style=color:#3e999f>/ </span><span>(fps </span><span style=color:#3e999f>* </span><span>transition_time)
+</span><span>
+</span><span style=color:#8e908c># наши фоточки
+</span><span>i1 </span><span style=color:#3e999f>= </span><span style=color:#c82728>load_image</span><span style=color:#4271ae>(</span><span style=color:#839c00>'../demo/01.png'</span><span style=color:#4271ae>)
+</span><span>i2 </span><span style=color:#3e999f>= </span><span style=color:#c82728>load_image</span><span style=color:#4271ae>(</span><span style=color:#839c00>'../demo/02.png'</span><span style=color:#4271ae>)
+</span><span>
+</span><span style=color:#8e908c># создаём наш pipe
+</span><span>render </span><span style=color:#3e999f>= </span><span style=color:#c82728>ffmpeg</span><span style=color:#4271ae>(</span><span style=color:#f07219>fps</span><span style=color:#3e999f>=</span><span style=color:#4271ae>fps, </span><span style=color:#f07219>output</span><span style=color:#3e999f>=</span><span style=color:#4271ae>output)
+</span><span style=color:#8e908c># смешиваем и записываем в pipe
+</span><span style=color:#8959a8>for </span><span>alpha </span><span style=color:#8959a8>in </span><span style=color:#c82728>alpha_range</span><span style=color:#4271ae>(</span><span style=color:#f07219>0</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>, step)</span><span>:
+</span><span>    </span><span style=color:#4271ae>render.</span><span style=color:#c82728>push</span><span style=color:#4271ae>(</span><span style=color:#c82728>blend</span><span style=color:#4271ae>(i1, i2, alpha))
+</span></code></pre><p>В результате скорость обработки кадров оказался ниже плинтуса (~0.5 fps), да и pipe часто обрывался.<h1 id=2-yi-blin-optimizatsiia>2-ый блин, оптимизация</h1><p>На втором этапе решил упростить задачу для ffmpeg и передавать не png картинки, а сразу сырые данные в формате <code>rgb24</code>.<p>Начнём как всегда с <code>ffmpeg</code><pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>import </span><span>subprocess </span><span style=color:#8959a8>as </span><span>sp
+</span><span>
+</span><span style=color:#8e908c># всё ещё пофиг на title case
+</span><span style=color:#8959a8>class </span><span style=color:#c99e00>ffmpeg</span><span>:
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>__init__</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>fps</span><span>, </span><span style=color:#f07219>size</span><span>, </span><span style=color:#f07219>output</span><span>):
+</span><span>        </span><span style=color:#c82728>self</span><span>.cmd_out </span><span style=color:#3e999f>= </span><span>[
+</span><span>            </span><span style=color:#839c00>'ffmpeg'</span><span>,
+</span><span>            </span><span style=color:#8e908c># сырой формат данных в виде rgb24, т.е. по 8 бит на канал
+</span><span>            </span><span style=color:#839c00>'-f'</span><span>, </span><span style=color:#839c00>'rawvideo'</span><span>, </span><span style=color:#839c00>'-pix_fmt'</span><span>, </span><span style=color:#839c00>'rgb24'</span><span>,
+</span><span>            </span><span style=color:#8e908c># размер фото, обратный порядок из-за формата представления у numpy
+</span><span>            </span><span style=color:#839c00>'-video_size'</span><span>, </span><span style=color:#8959a8>f</span><span style=color:#839c00>'</span><span>{size[</span><span style=color:#f07219>1</span><span>]}</span><span style=color:#839c00>x</span><span>{size[</span><span style=color:#f07219>0</span><span>]}</span><span style=color:#839c00>'</span><span>,
+</span><span>            </span><span style=color:#8e908c># fps
+</span><span>            </span><span style=color:#839c00>'-r'</span><span>, </span><span style=color:#c99e00>str</span><span style=color:#4271ae>(fps)</span><span>,
+</span><span>            </span><span style=color:#8e908c># наш pipe
+</span><span>            </span><span style=color:#839c00>'-i'</span><span>, </span><span style=color:#839c00>'-'</span><span>,
+</span><span>            </span><span style=color:#8e908c># профиль кодирования видео оптимизирующий под youtube (также подходит для telegram)
+</span><span>            </span><span style=color:#839c00>'-c:v'</span><span>, </span><span style=color:#839c00>'libx264'</span><span>, </span><span style=color:#839c00>'-preset'</span><span>, </span><span style=color:#839c00>'slow'</span><span>, </span><span style=color:#839c00>'-profile:v'</span><span>, </span><span style=color:#839c00>'high'</span><span>, </span><span style=color:#839c00>'-crf'</span><span>, </span><span style=color:#839c00>'18'</span><span>, </span><span style=color:#839c00>'-coder'</span><span>, </span><span style=color:#839c00>'1'</span><span>,
+</span><span>            </span><span style=color:#8e908c># формат картинки в видео
+</span><span>            </span><span style=color:#839c00>'-pix_fmt'</span><span>, </span><span style=color:#839c00>'yuv420p'</span><span>,
+</span><span>            </span><span style=color:#8e908c># с размеров кратным 2-ке по высоте
+</span><span>            </span><span style=color:#839c00>'-vf'</span><span>, </span><span style=color:#839c00>'scale=iw:-2'</span><span>,
+</span><span>            </span><span style=color:#8e908c># ещё параметры оптимизации под youtube
+</span><span>            </span><span style=color:#839c00>'-movflags'</span><span>, </span><span style=color:#839c00>'+faststart'</span><span>, </span><span style=color:#839c00>'-g'</span><span>, </span><span style=color:#839c00>'30'</span><span>, </span><span style=color:#839c00>'-bf'</span><span>, </span><span style=color:#839c00>'2'</span><span>,
+</span><span>            </span><span style=color:#8e908c># игнорируем существующий файл + имя выходного файла
+</span><span>            </span><span style=color:#839c00>'-y'</span><span>, </span><span style=color:#c99e00>str</span><span style=color:#4271ae>(output)
+</span><span>        ]
+</span><span>        </span><span style=color:#8e908c># теперь у pipe будет буфер по размеру изображения
+</span><span>        </span><span style=color:#c82728>self</span><span>.pipe </span><span style=color:#3e999f>= </span><span style=color:#4271ae>sp.</span><span style=color:#c82728>Popen</span><span style=color:#4271ae>(</span><span style=color:#c82728>self</span><span style=color:#4271ae>.cmd_out, </span><span style=color:#f07219>stdin</span><span style=color:#3e999f>=</span><span style=color:#4271ae>sp.</span><span style=color:#c82728>PIPE</span><span style=color:#4271ae>, </span><span style=color:#f07219>bufsize</span><span style=color:#3e999f>=</span><span style=color:#f07219>3 </span><span style=color:#3e999f>* </span><span style=color:#4271ae>size[</span><span style=color:#f07219>0</span><span style=color:#4271ae>] </span><span style=color:#3e999f>* </span><span style=color:#4271ae>size[</span><span style=color:#f07219>1</span><span style=color:#4271ae>])
+</span><span>
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>push</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>frame</span><span>):
+</span><span>        </span><span style=color:#8e908c># пишем байты прямо в pipe
+</span><span>        </span><span style=color:#c82728>self</span><span style=color:#4271ae>.pipe.stdin.</span><span style=color:#c82728>write</span><span style=color:#4271ae>(frame)
+</span><span>
+</span><span>    </span><span style=color:#8e908c># аналогично прошлому коду
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>__del__</span><span>(</span><span style=color:#f07219>self</span><span>):
+</span><span>        </span><span style=color:#c82728>self</span><span style=color:#4271ae>.pipe.stdin.</span><span style=color:#c82728>close</span><span style=color:#4271ae>()
+</span><span>        </span><span style=color:#c82728>self</span><span style=color:#4271ae>.pipe.</span><span style=color:#c82728>wait</span><span style=color:#4271ae>()
+</span><span>
+</span><span>        </span><span style=color:#8959a8>if </span><span style=color:#c82728>self</span><span>.pipe.returncode </span><span style=color:#3e999f>!= </span><span style=color:#f07219>0</span><span>:
+</span><span>            </span><span style=color:#8959a8>raise </span><span style=color:#4271ae>sp.</span><span style=color:#c82728>CalledProcessError</span><span style=color:#4271ae>(</span><span style=color:#c82728>self</span><span style=color:#4271ae>.pipe.returncode, </span><span style=color:#c82728>self</span><span style=color:#4271ae>.cmd_out)
+</span></code></pre><p>Загрузка изображений тоже преобразилась<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>from </span><span>PIL </span><span style=color:#8959a8>import </span><span>Image, UnidentifiedImageError
+</span><span style=color:#8959a8>import </span><span>numpy </span><span style=color:#8959a8>as </span><span>np
+</span><span>
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>load_image</span><span>(</span><span style=color:#f07219>file</span><span>):
+</span><span>    </span><span style=color:#8959a8>try</span><span>:
+</span><span>        image </span><span style=color:#3e999f>= </span><span style=color:#4271ae>Image.</span><span style=color:#c82728>open</span><span style=color:#4271ae>(file)
+</span><span>        </span><span style=color:#8e908c># преобразуем в массив numpy с RGB палитрой
+</span><span>        result </span><span style=color:#3e999f>= </span><span style=color:#4271ae>np.</span><span style=color:#c82728>array</span><span style=color:#4271ae>(image.</span><span style=color:#c82728>convert</span><span style=color:#4271ae>(</span><span style=color:#839c00>'RGB'</span><span style=color:#4271ae>), </span><span style=color:#f07219>dtype</span><span style=color:#3e999f>=</span><span style=color:#4271ae>np.float)
+</span><span>        </span><span style=color:#8e908c># нам нужен размер изображения
+</span><span>        size </span><span style=color:#3e999f>= </span><span>result.shape
+</span><span>        </span><span style=color:#8e908c># и возвращаем в одномерном виде, т.к. проще работать + размер изображения
+</span><span>        </span><span style=color:#8959a8>return </span><span style=color:#4271ae>result.</span><span style=color:#c82728>reshape</span><span style=color:#4271ae>((size[</span><span style=color:#f07219>1</span><span style=color:#4271ae>] </span><span style=color:#3e999f>* </span><span style=color:#4271ae>size[</span><span style=color:#f07219>0</span><span style=color:#4271ae>] </span><span style=color:#3e999f>* </span><span style=color:#4271ae>size[</span><span style=color:#f07219>2</span><span style=color:#4271ae>],))</span><span>, size
+</span><span>    </span><span style=color:#8959a8>except </span><span>UnidentifiedImageError:
+</span><span>        </span><span style=color:#4271ae>print(</span><span style=color:#8959a8>f</span><span style=color:#839c00>'[error]: cannot open </span><span style=color:#4271ae>{file}</span><span style=color:#839c00> file'</span><span style=color:#4271ae>)
+</span><span>        </span><span style=color:#c82728>exit</span><span style=color:#4271ae>()
+</span></code></pre><p>Функция <code>alpha_range</code> вообще не изменилась, а вот <code>blend</code> стала интереснее<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>def </span><span style=color:#4271ae>blend</span><span>(</span><span style=color:#f07219>i1</span><span>, </span><span style=color:#f07219>i2</span><span>, </span><span style=color:#f07219>alpha</span><span>):
+</span><span>    </span><span style=color:#8e908c># создаём пустой массив
+</span><span>    out </span><span style=color:#3e999f>= </span><span style=color:#4271ae>np.</span><span style=color:#c82728>zeros_like</span><span style=color:#4271ae>(i1)
+</span><span>    </span><span style=color:#8e908c># проходим по всем элементам и смешиваем их
+</span><span>    out[:] </span><span style=color:#3e999f>= </span><span>i1[:] </span><span style=color:#3e999f>* </span><span>alpha </span><span style=color:#3e999f>+ </span><span>i2[:] </span><span style=color:#3e999f>* </span><span>(</span><span style=color:#f07219>1.0 </span><span style=color:#3e999f>- </span><span>alpha)
+</span><span>    </span><span style=color:#8e908c># возвращаем набор байтов
+</span><span>    </span><span style=color:#8959a8>return </span><span style=color:#4271ae>out.</span><span style=color:#c82728>astype</span><span style=color:#4271ae>(np.uint8).</span><span style=color:#c82728>tobytes</span><span style=color:#4271ae>()
+</span></code></pre><p>И код запуска изменился самую малость<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8e908c># .. пропустим константы ..
+</span><span>i1, size </span><span style=color:#3e999f>= </span><span style=color:#c82728>load_image</span><span style=color:#4271ae>(</span><span style=color:#839c00>'../demo/01.png'</span><span style=color:#4271ae>)
+</span><span>i2, </span><span style=color:#c82728>_ </span><span style=color:#3e999f>= </span><span style=color:#c82728>load_image</span><span style=color:#4271ae>(</span><span style=color:#839c00>'../demo/02.png'</span><span style=color:#4271ae>)
+</span><span>
+</span><span>render </span><span style=color:#3e999f>= </span><span style=color:#c82728>ffmpeg</span><span style=color:#4271ae>(</span><span style=color:#f07219>fps</span><span style=color:#3e999f>=</span><span style=color:#4271ae>fps, </span><span style=color:#f07219>size</span><span style=color:#3e999f>=</span><span style=color:#4271ae>size, </span><span style=color:#f07219>output</span><span style=color:#3e999f>=</span><span style=color:#4271ae>output)
+</span><span style=color:#8959a8>for </span><span>alpha </span><span style=color:#8959a8>in </span><span style=color:#c82728>alpha_range</span><span style=color:#4271ae>(</span><span style=color:#f07219>0</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>, step)</span><span>:
+</span><span>    </span><span style=color:#4271ae>render.</span><span style=color:#c82728>push</span><span style=color:#4271ae>(</span><span style=color:#c82728>blend</span><span style=color:#4271ae>(i1, i2, alpha))
+</span></code></pre><p>В этой версии сразу видно сильный прирост по скорости работы.<h1 id=3-aia-blin-rust>3-ая блин, rust</h1><p>Реализовав рабочий прототип на python я решил всё это дело переписать на rust.<p>Поискав библиотеки для работы с изображениям наткнулся на <a href=https://crates.io/crates/lodepng>lodepng</a> у которой минимальное количество зависимостей, да и API простое.<p>Перейдём же к коду.<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8e908c>// объявим нашу структуру, которая будет хранить все нужные нам данные
+</span><span>#[</span><span style=color:#c82728>derive</span><span>(Debug, Default)]
+</span><span style=color:#8959a8>struct </span><span>Render {
+</span><span>    </span><span style=color:#8e908c>// список из значений альфы
+</span><span>    </span><span style=color:#c82728>transition</span><span>: </span><span style=color:#c99e00>Vec</span><span><</span><span style=color:#8959a8>f32</span><span>>,
+</span><span>    </span><span style=color:#8e908c>// 1-ая фотка в rgb24
+</span><span>    </span><span style=color:#c82728>image1</span><span>: </span><span style=color:#c99e00>Vec</span><span><</span><span style=color:#8959a8>u8</span><span>>,
+</span><span>    </span><span style=color:#8e908c>// 2-я
+</span><span>    </span><span style=color:#c82728>image2</span><span>: </span><span style=color:#c99e00>Vec</span><span><</span><span style=color:#8959a8>u8</span><span>>,
+</span><span>    </span><span style=color:#8e908c>// имя выходного видео
+</span><span>    </span><span style=color:#c82728>output</span><span>: String,
+</span><span>    </span><span style=color:#8e908c>// размер фото
+</span><span>    </span><span style=color:#c82728>size</span><span>: Size,
+</span><span>}
+</span><span>
+</span><span style=color:#8e908c>// структура для размера изображения
+</span><span>#[</span><span style=color:#c82728>derive</span><span>(Debug, Default, PartialEq, Eq)]
+</span><span style=color:#8959a8>struct </span><span>Size {
+</span><span>    </span><span style=color:#c82728>width</span><span>: </span><span style=color:#8959a8>usize</span><span>,
+</span><span>    </span><span style=color:#c82728>height</span><span>: </span><span style=color:#8959a8>usize</span><span>,
+</span><span>}
+</span><span>
+</span><span style=color:#8e908c>// с одной функцией
+</span><span style=color:#8959a8>impl </span><span>Size {
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>new</span><span>(</span><span style=color:#f07219>width</span><span>: </span><span style=color:#8959a8>usize</span><span>, </span><span style=color:#f07219>height</span><span>: </span><span style=color:#8959a8>usize</span><span>) -> Size {
+</span><span>        Size { width, height }
+</span><span>    }
+</span><span>}
+</span></code></pre><p>Теперь стоит определиться с функциями структуры <code>Render</code>, а именно нужны:<ol><li>загрузка изображений<li>добавление переходов<li>задание выходного файла<li>запуск рендеринга<li>смешивание фотографий</ol><pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>impl </span><span>Render {
+</span><span>    </span><span style=color:#8e908c>// 1
+</span><span>    </span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>first_image</span><span>&LTP: </span><span style=color:#c99e00>AsRef</span><span>&LTPath>>(</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>filename</span><span>: P) -> Render {}
+</span><span>    </span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>second_image</span><span>&LTP: </span><span style=color:#c99e00>AsRef</span><span>&LTPath>>(</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>filename</span><span>: P) -> Render {}
+</span><span>    </span><span style=color:#8e908c>// 2
+</span><span>    </span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>add_transition</span><span>(</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>start</span><span>: </span><span style=color:#8959a8>f32</span><span>, </span><span style=color:#f07219>stop</span><span>: </span><span style=color:#8959a8>f32</span><span>, </span><span style=color:#f07219>step</span><span>: </span><span style=color:#8959a8>f32</span><span>) -> Render {}
+</span><span>    </span><span style=color:#8e908c>// 3
+</span><span>    </span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>set_output_file</span><span>(</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>output</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>str</span><span>) -> Render {}
+</span><span>    </span><span style=color:#8e908c>// 4
+</span><span>    </span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>render</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>fps</span><span>: </span><span style=color:#8959a8>u8</span><span>) {}
+</span><span>    </span><span style=color:#8e908c>// 5
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>blend</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>alpha</span><span>: </span><span style=color:#8959a8>f32</span><span>) -> </span><span style=color:#c99e00>Vec</span><span><</span><span style=color:#8959a8>u8</span><span>> {}
+</span><span>}
+</span></code></pre><p>Сразу отмечу, что функции 1-3 сделаны специально в стиле <a href=https://en.wikipedia.org/wiki/Builder_pattern>паттерна строитель</a>.<p>Функция 4 будет поглощать наш объект, чтобы после рендеринга уже нельзя было ничего сделать.<p>И ещё, все функции, кроме 5-ой, доступны для внешнего использования.<p>Стоит упомянуть сразу вспомогательную функцию, которая нам поможет в загрузке изображений в <code>rgb24</code>.<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>extern crate</span><span> lodepng;
+</span><span style=color:#8959a8>extern crate</span><span> rgb;
+</span><span>
+</span><span style=color:#8959a8>use </span><span>std::path::Path;
+</span><span style=color:#8959a8>use crate</span><span>::rgb::ComponentBytes;
+</span><span>
+</span><span style=color:#8e908c>// вспомотагельная функция по загрузке изображений
+</span><span style=color:#8959a8>fn </span><span style=color:#4271ae>load_image</span><span>&LTP: </span><span style=color:#c99e00>AsRef</span><span>&LTPath>>(</span><span style=color:#f07219>filename</span><span>: P) -> </span><span style=color:#c99e00>Result</span><span><(</span><span style=color:#c99e00>Vec</span><span><</span><span style=color:#8959a8>u8</span><span>>, Size), lodepng::Error> {
+</span><span>    </span><span style=color:#8e908c>// загружаем нашу pngшку
+</span><span>    </span><span style=color:#8959a8>let</span><span> image </span><span style=color:#3e999f>= </span><span>lodepng::decode24_file(filename)</span><span style=color:#3e999f>?</span><span>;
+</span><span>    </span><span style=color:#8e908c>// заполняем структуру размера фото
+</span><span>    </span><span style=color:#8959a8>let</span><span> size </span><span style=color:#3e999f>= </span><span>Size::new(image.width, image.height);
+</span><span>    </span><span style=color:#8e908c>// возврашаем данные в нужном нам виде
+</span><span>    </span><span style=color:#c99e00>Ok</span><span>((image.buffer.</span><span style=color:#4271ae>as_bytes</span><span>().</span><span style=color:#4271ae>to_vec</span><span>(), size))
+</span><span>}
+</span></code></pre><p>Базовые приготовления окончены, можно переходить к реализации функций <code>Render</code>.<p>Начнём с простого, с пунктов 1 и 3:<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>first_image</span><span>&LTP: </span><span style=color:#c99e00>AsRef</span><span>&LTPath>>(</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>filename</span><span>: P) -> Render {
+</span><span>    </span><span style=color:#8e908c>// загружаем фото
+</span><span>    </span><span style=color:#8959a8>let </span><span>(image, size) </span><span style=color:#3e999f>= </span><span style=color:#4271ae>load_image</span><span>(filename).</span><span style=color:#4271ae>unwrap</span><span>();
+</span><span>    </span><span style=color:#8e908c>// и заполянем наши переменные
+</span><span>    </span><span style=color:#c82728>self</span><span>.image1 </span><span style=color:#3e999f>=</span><span> image;
+</span><span>    </span><span style=color:#c82728>self</span><span>.size </span><span style=color:#3e999f>=</span><span> size;
+</span><span>    </span><span style=color:#8e908c>// передаём дальше нашу структуру
+</span><span>    </span><span style=color:#c82728>self
+</span><span>}
+</span><span>
+</span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>second_image</span><span>&LTP: </span><span style=color:#c99e00>AsRef</span><span>&LTPath>>(</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>filename</span><span>: P) -> Render {
+</span><span>    </span><span style=color:#8959a8>let </span><span>(image, size) </span><span style=color:#3e999f>= </span><span style=color:#4271ae>load_image</span><span>(filename).</span><span style=color:#4271ae>unwrap</span><span>();
+</span><span>    </span><span style=color:#8e908c>// никаких переходов в случае картинок разного размера
+</span><span>    </span><span style=color:#8959a8>if </span><span style=color:#c82728>self</span><span>.size </span><span style=color:#3e999f>!=</span><span> size {
+</span><span>        panic!(</span><span style=color:#839c00>"image size mismatch"</span><span>);
+</span><span>    }
+</span><span>    </span><span style=color:#c82728>self</span><span>.image2 </span><span style=color:#3e999f>=</span><span> image;
+</span><span>    </span><span style=color:#c82728>self
+</span><span>}
+</span><span>
+</span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>set_output_file</span><span>(</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>output</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>str</span><span>) -> Render {
+</span><span>    </span><span style=color:#8e908c>// просто передаём владение над строкой
+</span><span>    </span><span style=color:#c82728>self</span><span>.output </span><span style=color:#3e999f>=</span><span> output.</span><span style=color:#4271ae>to_owned</span><span>();
+</span><span>    </span><span style=color:#c82728>self
+</span><span>}
+</span></code></pre><p>Генерацию перехода (значений альфа) сделаем с возможностью увеличения и уменьшения в зависимости от знака <code>step</code>.<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>add_transition</span><span>(</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>start</span><span>: </span><span style=color:#8959a8>f32</span><span>, </span><span style=color:#f07219>stop</span><span>: </span><span style=color:#8959a8>f32</span><span>, </span><span style=color:#f07219>step</span><span>: </span><span style=color:#8959a8>f32</span><span>) -> Render {
+</span><span>    </span><span style=color:#8e908c>// эти два варианта мы игнорируем, т.к. они расходятся
+</span><span>    </span><span style=color:#8959a8>let</span><span> bad_condition </span><span style=color:#3e999f>= </span><span>(start </span><span style=color:#3e999f>></span><span> stop </span><span style=color:#3e999f>&&</span><span> step </span><span style=color:#3e999f>> </span><span style=color:#f07219>0.0</span><span>) </span><span style=color:#3e999f>|| </span><span>(start </span><span style=color:#3e999f><</span><span> stop </span><span style=color:#3e999f>&&</span><span> step </span><span style=color:#3e999f>< </span><span style=color:#f07219>0.0</span><span>);
+</span><span>    </span><span style=color:#8e908c>// для всех остальных считаем количество шагов
+</span><span>    </span><span style=color:#8959a8>let</span><span> count </span><span style=color:#3e999f>= </span><span style=color:#8959a8>if </span><span style=color:#3e999f>!</span><span>bad_condition {
+</span><span>        ((start </span><span style=color:#3e999f>-</span><span> stop) </span><span style=color:#3e999f>/</span><span> step).</span><span style=color:#4271ae>abs</span><span>() </span><span style=color:#3e999f>as </span><span style=color:#8959a8>u32 </span><span style=color:#3e999f>+ </span><span style=color:#f07219>1
+</span><span>    } </span><span style=color:#8959a8>else </span><span>{
+</span><span>        </span><span style=color:#f07219>0
+</span><span>    };
+</span><span>    </span><span style=color:#8e908c>// и генерируем переход
+</span><span>    </span><span style=color:#8959a8>let mut</span><span> transition: </span><span style=color:#c99e00>Vec</span><span><</span><span style=color:#8959a8>f32</span><span>> </span><span style=color:#3e999f>= </span><span>(</span><span style=color:#f07219>0</span><span style=color:#3e999f>..</span><span>count).</span><span style=color:#4271ae>map</span><span>(|</span><span style=color:#f07219>x</span><span>| start </span><span style=color:#3e999f>+</span><span> x </span><span style=color:#3e999f>as </span><span style=color:#8959a8>f32 </span><span style=color:#3e999f>*</span><span> step).</span><span style=color:#4271ae>collect</span><span>();
+</span><span>    </span><span style=color:#c82728>self</span><span>.transition.</span><span style=color:#4271ae>append</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut</span><span> transition);
+</span><span>    </span><span style=color:#c82728>self
+</span><span>}
+</span></code></pre><p>Реализация простая - сначала проверяем, что мы сможем за конечное число шагом завершить построение, а потом рассчитываем количество шагов которое нужно сделать и добавляем эти значения в массив <code>transition</code>.<p>Код даже можно оптимизировать перенеся добавление новых значений под условие <code>if</code>.<p>Пойдём далее, к коду смешивания<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>fn </span><span style=color:#4271ae>blend</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>alpha</span><span>: </span><span style=color:#8959a8>f32</span><span>) -> </span><span style=color:#c99e00>Vec</span><span><</span><span style=color:#8959a8>u8</span><span>> {
+</span><span>    </span><span style=color:#8e908c>// инициализируем выходной массив по размеру изображения
+</span><span>    </span><span style=color:#8959a8>let mut</span><span> r </span><span style=color:#3e999f>= </span><span>vec![</span><span style=color:#f07219>0</span><span>; </span><span style=color:#c82728>self</span><span>.image1.</span><span style=color:#4271ae>len</span><span>()];
+</span><span>    </span><span style=color:#8e908c>// итерируемся по 3-м массивам, но r у нас будет изменяемый
+</span><span>    </span><span style=color:#8959a8>for </span><span>(d, (a, b)) </span><span style=color:#3e999f>in</span><span> r.</span><span style=color:#4271ae>iter_mut</span><span>().</span><span style=color:#4271ae>zip</span><span>(</span><span style=color:#c82728>self</span><span>.image1.</span><span style=color:#4271ae>iter</span><span>().</span><span style=color:#4271ae>zip</span><span>(</span><span style=color:#c82728>self</span><span>.image2.</span><span style=color:#4271ae>iter</span><span>())) {
+</span><span>        </span><span style=color:#8e908c>// записываем в массив новое значение расчитанное по формуле
+</span><span>        </span><span style=color:#3e999f>*</span><span>d </span><span style=color:#3e999f>= </span><span>(</span><span style=color:#3e999f>*</span><span>a </span><span style=color:#3e999f>as </span><span style=color:#8959a8>f32 </span><span style=color:#3e999f>*</span><span> alpha </span><span style=color:#3e999f>+ *</span><span>b </span><span style=color:#3e999f>as </span><span style=color:#8959a8>f32 </span><span style=color:#3e999f>* </span><span>(</span><span style=color:#f07219>1.0 </span><span style=color:#3e999f>-</span><span> alpha)).</span><span style=color:#4271ae>round</span><span>() </span><span style=color:#3e999f>as </span><span style=color:#8959a8>u8</span><span>;
+</span><span>    }
+</span><span>    </span><span style=color:#8e908c>// готово!
+</span><span>    r
+</span><span>}
+</span></code></pre><p>Осталось самое тривиальное - создать пайп между программой и ffmpeg для передачи данных<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>render</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>fps</span><span>: </span><span style=color:#8959a8>u8</span><span>) {
+</span><span>    </span><span style=color:#8e908c>// аргументы для ffmpeg
+</span><span>    </span><span style=color:#8959a8>let</span><span> arguments </span><span style=color:#3e999f>= </span><span>[
+</span><span>        </span><span style=color:#8e908c>// входной формат фото
+</span><span>        </span><span style=color:#839c00>"-f"</span><span>, </span><span style=color:#839c00>"rawvideo"</span><span>, </span><span style=color:#839c00>"-pix_fmt"</span><span>, </span><span style=color:#839c00>"rgb24"</span><span>,
+</span><span>        </span><span style=color:#8e908c>// + размер
+</span><span>        </span><span style=color:#839c00>"-video_size"</span><span>, </span><span style=color:#3e999f>&</span><span>format!(</span><span style=color:#839c00>"</span><span>{}</span><span style=color:#839c00>x</span><span>{}</span><span style=color:#839c00>"</span><span>, </span><span style=color:#c82728>self</span><span>.size.width, </span><span style=color:#c82728>self</span><span>.size.height),
+</span><span>        </span><span style=color:#8e908c>// + fps
+</span><span>        </span><span style=color:#839c00>"-r"</span><span>, </span><span style=color:#3e999f>&</span><span>format!(</span><span style=color:#839c00>"</span><span>{}</span><span style=color:#839c00>"</span><span>, fps),
+</span><span>        </span><span style=color:#8e908c>// нам нужен pipe
+</span><span>        </span><span style=color:#839c00>"-i"</span><span>, </span><span style=color:#839c00>"-"</span><span>,
+</span><span>        </span><span style=color:#8e908c>// профиль кодирования видео оптимизирующий под youtube (также подходит для telegram)
+</span><span>        </span><span style=color:#839c00>"-c:v"</span><span>, </span><span style=color:#839c00>"libx264"</span><span>, </span><span style=color:#839c00>"-preset"</span><span>, </span><span style=color:#839c00>"slow"</span><span>, </span><span style=color:#839c00>"-profile:v"</span><span>, </span><span style=color:#839c00>"high"</span><span>, </span><span style=color:#839c00>"-crf"</span><span>, </span><span style=color:#839c00>"18"</span><span>, </span><span style=color:#839c00>"-coder"</span><span>, </span><span style=color:#839c00>"1"</span><span>,
+</span><span>        </span><span style=color:#8e908c>// формат картинки в видео
+</span><span>        </span><span style=color:#839c00>"-pix_fmt"</span><span>, </span><span style=color:#839c00>"yuv420p"</span><span>,
+</span><span>        </span><span style=color:#8e908c>// с размеров кратным 2-ке по высоте
+</span><span>        </span><span style=color:#839c00>"-vf"</span><span>, </span><span style=color:#839c00>"scale=iw:-2"</span><span>,
+</span><span>        </span><span style=color:#8e908c>// ещё параметры оптимизации под youtube
+</span><span>        </span><span style=color:#839c00>"-movflags"</span><span>, </span><span style=color:#839c00>"+faststart"</span><span>, </span><span style=color:#839c00>"-g"</span><span>, </span><span style=color:#839c00>"30"</span><span>, </span><span style=color:#839c00>"-bf"</span><span>, </span><span style=color:#839c00>"2"</span><span>,
+</span><span>        </span><span style=color:#8e908c>// игнорируем существующий файл + имя выходного файла
+</span><span>        </span><span style=color:#839c00>"-y"</span><span>, </span><span style=color:#3e999f>&</span><span style=color:#c82728>self</span><span>.output,
+</span><span>    ];
+</span><span>    </span><span style=color:#8e908c>// создаём процесс
+</span><span>    </span><span style=color:#8959a8>let mut</span><span> process </span><span style=color:#3e999f>= </span><span style=color:#8959a8>match </span><span>Command::new(</span><span style=color:#839c00>"ffmpeg"</span><span>)
+</span><span>        </span><span style=color:#8e908c>// с аргументами
+</span><span>        .</span><span style=color:#4271ae>args</span><span>(</span><span style=color:#3e999f>&</span><span>arguments)
+</span><span>        </span><span style=color:#8e908c>// и stdin как pipe
+</span><span>        .</span><span style=color:#4271ae>stdin</span><span>(Stdio::piped())
+</span><span>        </span><span style=color:#8e908c>// спавним процесс
+</span><span>        .</span><span style=color:#4271ae>spawn</span><span>()
+</span><span>    {
+</span><span>        </span><span style=color:#c99e00>Err</span><span>(why) </span><span style=color:#3e999f>=> </span><span>panic!(</span><span style=color:#839c00>"couldn't spawn ffmpeg: {}"</span><span>, why),
+</span><span>        </span><span style=color:#c99e00>Ok</span><span>(process) </span><span style=color:#3e999f>=></span><span> process,
+</span><span>    };
+</span><span>    {
+</span><span>        </span><span style=color:#8e908c>// заимствуем stdin в таком виде чтобы не захватить process
+</span><span>        </span><span style=color:#8959a8>let</span><span> stdin </span><span style=color:#3e999f>=</span><span> process.stdin.</span><span style=color:#4271ae>as_mut</span><span>().</span><span style=color:#4271ae>unwrap</span><span>();
+</span><span>        </span><span style=color:#8e908c>// и фигачим в него наши картиночки
+</span><span>        </span><span style=color:#8959a8>for</span><span> alpha </span><span style=color:#3e999f>in &</span><span style=color:#c82728>self</span><span>.transition {
+</span><span>            </span><span style=color:#8e908c>// смешиваем в нужных пропорциях
+</span><span>            </span><span style=color:#8959a8>let</span><span> img </span><span style=color:#3e999f>= </span><span style=color:#c82728>self</span><span>.</span><span style=color:#4271ae>blend</span><span>(</span><span style=color:#3e999f>*</span><span>alpha);
+</span><span>            </span><span style=color:#8e908c>// и записываем в pipe
+</span><span>            </span><span style=color:#8959a8>match</span><span> stdin.</span><span style=color:#4271ae>write_all</span><span>(</span><span style=color:#3e999f>&</span><span>img) {
+</span><span>                </span><span style=color:#c99e00>Err</span><span>(why) </span><span style=color:#3e999f>=> </span><span>panic!(</span><span style=color:#839c00>"couldn't write to ffmpeg stdin: {}"</span><span>, why),
+</span><span>                </span><span style=color:#c99e00>Ok</span><span>(</span><span style=color:#3e999f>_</span><span>) </span><span style=color:#3e999f>=> </span><span>(),
+</span><span>            };
+</span><span>        }
+</span><span>    }
+</span><span>    </span><span style=color:#8e908c>// ожидаем завершения ffmpeg
+</span><span>    </span><span style=color:#8959a8>let</span><span> _result </span><span style=color:#3e999f>=</span><span> process.</span><span style=color:#4271ae>wait</span><span>().</span><span style=color:#4271ae>unwrap</span><span>();
+</span><span>}
+</span></code></pre><p>И заканчивая напишем <code>main</code><pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>fn </span><span style=color:#4271ae>main</span><span>() {
+</span><span>    </span><span style=color:#8e908c>// время ролика в секундах
+</span><span>    </span><span style=color:#8959a8>let</span><span> transition_time </span><span style=color:#3e999f>= </span><span style=color:#f07219>5</span><span>;
+</span><span>    </span><span style=color:#8e908c>// количество кадров в секунду у выходного видео
+</span><span>    </span><span style=color:#8959a8>let</span><span> fps </span><span style=color:#3e999f>= </span><span style=color:#f07219>25</span><span>;
+</span><span>    </span><span style=color:#8e908c>// шаг для создания перехода на заданное время и fps
+</span><span>    </span><span style=color:#8e908c>// 2.0, т.к. у нас будет 2 перехода
+</span><span>    </span><span style=color:#8959a8>let</span><span> step </span><span style=color:#3e999f>= </span><span style=color:#f07219>2.0 </span><span style=color:#3e999f>/ </span><span>(fps </span><span style=color:#3e999f>*</span><span> transition_time) </span><span style=color:#3e999f>as </span><span style=color:#8959a8>f32</span><span>;
+</span><span>    </span><span style=color:#8e908c>// тут должно быть всё понятно
+</span><span>    </span><span style=color:#8959a8>let</span><span> i </span><span style=color:#3e999f>= </span><span>Render::default()
+</span><span>        .</span><span style=color:#4271ae>first_image</span><span>(</span><span style=color:#839c00>"./demo/01.png"</span><span>)
+</span><span>        .</span><span style=color:#4271ae>second_image</span><span>(</span><span style=color:#839c00>"./demo/02.png"</span><span>)
+</span><span>        </span><span style=color:#8e908c>// преобразование 1-ой фотографии во 2-ую
+</span><span>        .</span><span style=color:#4271ae>add_transition</span><span>(</span><span style=color:#f07219>0.0</span><span>, </span><span style=color:#f07219>1.0</span><span>, step)
+</span><span>        </span><span style=color:#8e908c>// и обратно
+</span><span>        .</span><span style=color:#4271ae>add_transition</span><span>(</span><span style=color:#f07219>1.0</span><span>, </span><span style=color:#f07219>0.0</span><span>, </span><span style=color:#3e999f>-</span><span>step)
+</span><span>        .</span><span style=color:#4271ae>set_output_file</span><span>(</span><span style=color:#839c00>"render.mp4"</span><span>);
+</span><span>    i.</span><span style=color:#4271ae>render</span><span>(fps);
+</span><span>}
+</span></code></pre><h1 id=zakliuchenie>Заключение</h1><p>В результате получаем следующее (нажми play через меню, если видео не работает). <video class="video media" style="max-width:640px;max-height:360px;margin:0 auto;display:block" alt=transition-render-2.5d autoplay height=360 loop playsinline preload=auto tabindex=-1 width=640><source src=/posts/transition-render-2.5d.mp4 type=video/mp4></video><p>На сегодня всё. Исходники можно найти <a href=https://github.com/FreeCX/vf-transtion>по следующей ссылке</a>.<p>Всем пока!<h1 id=chto-pochitat>Что почитать</h1><ol><li><a href=https://en.wikipedia.org/wiki/Alpha_compositing>Alpha compositing</a><li><a href=https://ffmpeg.org/documentation.html>Доки по ffmpeg</a><li><a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ">Как быть крутым программистом</a></ol></article><div class=back><a href=https://freecx.github.io/>Назад</a></div><div class=footer><span>Также читайте <a title="ты сам сломал ссылку, так что ничего личного" href=https://antoniii.github.io/> <s>antoniii</s> </a> <a href=https://citrux.github.io/>citrux</a> <a href=https://sputnikas.github.io/>sputnikas</a> </span></div><script>let msg=` А спонсор статей в моём блоге -- моя лень -- спонсор статей.`;[`=`.repeat(msg.length+ 1),msg,`=`.repeat(msg.length+ 1)].forEach(a=>console.warn(a))</script>

@@ -1,0 +1,98 @@
+<!doctype html><html lang=ru><head><meta charset=utf-8><meta content="IE=edge" http-equiv=X-UA-Compatible><meta content="width=device-width,initial-scale=1" name=viewport><title>Реализуем клеточный автомат</title><meta content="Кодерный понедельник" name=description><meta content=https://freecx.github.io/touch-icon.png property=og:image><link href=https://code.cdn.mozilla.net/fonts/fira.css rel=stylesheet><link href=https://freecx.github.io/favicon.png rel=icon><link href=https://freecx.github.io/touch-icon.png rel=apple-touch-icon><link href=https://freecx.github.io/main.css rel=stylesheet><link href=https://freecx.github.io/syntax.css rel=stylesheet><body><aside class=logo><a href=https://github.com/FreeCX> <img class=gravatar src=https://freecx.github.io/avatar.png> </a><span class=logo-prompt>Я на github</span></aside><article><div class=center><h1>Реализуем клеточный автомат</h1><time>26 February 2020</time></div><div class=divider></div><p>Всем привет.<p>Похоже что я слишком рано занялся работами для следующей статьи, но ничего. Сегодня будет не очень большая статья.<p>Быстро и просто реализуем клеточный автомат. В этот раз будем писать на питоне, чтобы уложиться менее чем в <em>100</em> строк.<p>Ну что, погнали!<h1 id=postanovka-zadachi>Постановка задачи</h1><p>Идея довольно проста... как и все остальные задачи что я рассматривал :)<p>Есть некая регулярная решётка ячеек. Каждая ячейка может находиться в одном из конечного множества <em>состояний</em>.<p>В нашем случае упростим до <em>активной</em> (1) и <em>неактивной</em> (0). Мы задаём начальное состояние данной регулярной решётки и на каждой итерации пересчитываем состояние всех ячеек по <em>некоторому</em> выбранному нами правилу.<p>Это очень поверхностное описание задачи. Для подробностей обратитесь к спец. литературе или к Стивену Вольфраму.<p>Навесим на нашу задачу несколько ограничений и требований:<ul><li>размер сетки: <em>100x100</em><li>количество итерации: <em>100</em><li>главная и побочная диагональ являются активными<li>а также активны следующие точки: <em>(50, 0), (0, 50), (99, 50), (50, 99)</em><li>состояние текущей ячейки (<em>cell[x, y]</em>) будем считать вот так:</ul><pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span>cell[x, y] </span><span style=color:#3e999f>= </span><span>cell[x </span><span style=color:#3e999f>- </span><span style=color:#f07219>1</span><span>, y </span><span style=color:#3e999f>- </span><span style=color:#f07219>1</span><span>] </span><span style=color:#3e999f>^ </span><span>cell[x </span><span style=color:#3e999f>+ </span><span style=color:#f07219>1</span><span>, y </span><span style=color:#3e999f>- </span><span style=color:#f07219>1</span><span>] </span><span style=color:#3e999f>^ </span><span>cell[x </span><span style=color:#3e999f>- </span><span style=color:#f07219>1</span><span>, y </span><span style=color:#3e999f>+ </span><span style=color:#f07219>1</span><span>] </span><span style=color:#3e999f>^ </span><span>cell[x </span><span style=color:#3e999f>+ </span><span style=color:#f07219>1</span><span>, y </span><span style=color:#3e999f>+ </span><span style=color:#f07219>1</span><span>]
+</span></code></pre><p>Ну что, приступим!<h1 id=realizatsiia>Реализация</h1><p>Для нашей задачи достаточно одной сущности, которая будет реализовывать всё что нам нужно — <em>доска</em>.<p>Давайте определим её, а также необходимые методы:<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>class </span><span style=color:#c99e00>Board</span><span>:
+</span><span>    </span><span style=color:#8e908c># кто нам доску создаст?
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>__init__</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>w</span><span>, </span><span style=color:#f07219>h</span><span>):
+</span><span>        </span><span style=color:#8959a8>pass
+</span><span>
+</span><span>    </span><span style=color:#8e908c># мы хотим получать значение ячейки
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>get</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>x</span><span>, </span><span style=color:#f07219>y</span><span>):
+</span><span>        </span><span style=color:#8959a8>pass
+</span><span>
+</span><span>    </span><span style=color:#8e908c># а также активировать ячейки
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>set</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>x</span><span>, </span><span style=color:#f07219>y</span><span>):
+</span><span>        </span><span style=color:#8959a8>pass
+</span><span>
+</span><span>    </span><span style=color:#8e908c># и расчитывать следующее состояние используя функцию rule
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>next</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>rule</span><span>):
+</span><span>        </span><span style=color:#8959a8>pass
+</span><span>
+</span><span>    </span><span style=color:#8e908c># также нужно куда-то всё это выводить
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>__str__</span><span>(</span><span style=color:#f07219>self</span><span>):
+</span><span>        </span><span style=color:#8959a8>pass
+</span></code></pre><p>Давайте пока повременим с реализацией данного класса и напишем код правила расчёта ячейки.<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8e908c># f -- функция возвращающая значение ячейки
+</span><span style=color:#8e908c># x, y -- координаты текущей ячейки
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>rule</span><span>(</span><span style=color:#f07219>f</span><span>, </span><span style=color:#f07219>x</span><span>, </span><span style=color:#f07219>y</span><span>):
+</span><span>    </span><span style=color:#8959a8>return </span><span style=color:#c82728>f</span><span style=color:#4271ae>(x </span><span style=color:#3e999f>- </span><span style=color:#f07219>1</span><span style=color:#4271ae>, y </span><span style=color:#3e999f>- </span><span style=color:#f07219>1</span><span style=color:#4271ae>) </span><span style=color:#3e999f>^ </span><span style=color:#c82728>f</span><span style=color:#4271ae>(x </span><span style=color:#3e999f>+ </span><span style=color:#f07219>1</span><span style=color:#4271ae>, y </span><span style=color:#3e999f>- </span><span style=color:#f07219>1</span><span style=color:#4271ae>) </span><span style=color:#3e999f>^</span><span>\
+</span><span>           </span><span style=color:#c82728>f</span><span style=color:#4271ae>(x </span><span style=color:#3e999f>- </span><span style=color:#f07219>1</span><span style=color:#4271ae>, y </span><span style=color:#3e999f>+ </span><span style=color:#f07219>1</span><span style=color:#4271ae>) </span><span style=color:#3e999f>^ </span><span style=color:#c82728>f</span><span style=color:#4271ae>(x </span><span style=color:#3e999f>+ </span><span style=color:#f07219>1</span><span style=color:#4271ae>, y </span><span style=color:#3e999f>+ </span><span style=color:#f07219>1</span><span style=color:#4271ae>)
+</span></code></pre><p>А теперь напишем базовый код, который будет выводить каждое из состояние на печать<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8e908c># положение наших точек
+</span><span>extra_cells </span><span style=color:#3e999f>= </span><span>[(</span><span style=color:#f07219>50</span><span>, </span><span style=color:#f07219>0</span><span>), (</span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>50</span><span>), (</span><span style=color:#f07219>99</span><span>, </span><span style=color:#f07219>50</span><span>), (</span><span style=color:#f07219>50</span><span>, </span><span style=color:#f07219>99</span><span>)]
+</span><span style=color:#8e908c># количество итераций
+</span><span>iterations </span><span style=color:#3e999f>= </span><span style=color:#f07219>100
+</span><span style=color:#8e908c># размер сетки
+</span><span>size </span><span style=color:#3e999f>= </span><span style=color:#f07219>100
+</span><span>
+</span><span style=color:#8e908c># инициализируем нашу доску
+</span><span>board </span><span style=color:#3e999f>= </span><span style=color:#c82728>Board</span><span style=color:#4271ae>(size, size)
+</span><span style=color:#8959a8>for </span><span>i </span><span style=color:#8959a8>in </span><span style=color:#4271ae>range(size)</span><span>:
+</span><span>    </span><span style=color:#8e908c># диагоналей
+</span><span>    </span><span style=color:#4271ae>board.</span><span style=color:#c82728>set</span><span style=color:#4271ae>(i, i)
+</span><span>    </span><span style=color:#4271ae>board.</span><span style=color:#c82728>set</span><span style=color:#4271ae>(size </span><span style=color:#3e999f>- </span><span style=color:#4271ae>i </span><span style=color:#3e999f>- </span><span style=color:#f07219>1</span><span style=color:#4271ae>, i)
+</span><span style=color:#8959a8>for </span><span>x, y </span><span style=color:#8959a8>in </span><span>extra_cells:
+</span><span>    </span><span style=color:#4271ae>board.</span><span style=color:#c82728>set</span><span style=color:#4271ae>(x, y)
+</span><span>
+</span><span style=color:#8e908c># выводим на печать дополнительную инфорацию
+</span><span style=color:#4271ae>print(</span><span style=color:#8959a8>f</span><span style=color:#839c00>'</span><span style=color:#4271ae>{size}</span><span style=color:#839c00>;</span><span style=color:#4271ae>{size}</span><span style=color:#839c00>;</span><span style=color:#4271ae>{iterations}</span><span style=color:#839c00>'</span><span style=color:#4271ae>)
+</span><span style=color:#4271ae>print(board)
+</span><span style=color:#8e908c># а также все итерации
+</span><span style=color:#8959a8>for </span><span style=color:#c82728>_ </span><span style=color:#8959a8>in </span><span style=color:#4271ae>range(</span><span style=color:#f07219>1</span><span style=color:#4271ae>, iterations)</span><span>:
+</span><span>    </span><span style=color:#4271ae>board.</span><span style=color:#c82728>next</span><span style=color:#4271ae>(rule)
+</span><span>    </span><span style=color:#4271ae>print(board)
+</span></code></pre><p>Обвязочный код готов, а теперь можно приступить к реализации методов класса <em>Board</em>.<p>Пойдём по порядку.<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>def </span><span style=color:#4271ae>__init__</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>w</span><span>, </span><span style=color:#f07219>h</span><span>):
+</span><span>    </span><span style=color:#8e908c># параметры доски
+</span><span>    </span><span style=color:#c82728>self</span><span>.width </span><span style=color:#3e999f>= </span><span>w
+</span><span>    </span><span style=color:#c82728>self</span><span>.height </span><span style=color:#3e999f>= </span><span>h
+</span><span>    </span><span style=color:#8e908c># создаём коллекцию для наших ячеек
+</span><span>    </span><span style=color:#c82728>self</span><span>.cell </span><span style=color:#3e999f>= </span><span style=color:#c99e00>set</span><span style=color:#4271ae>()
+</span><span>
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>get</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>x</span><span>, </span><span style=color:#f07219>y</span><span>):
+</span><span>    </span><span style=color:#8e908c># если мы выходим за границы нашей доски, то это False
+</span><span>    </span><span style=color:#8959a8>if </span><span>x </span><span style=color:#3e999f>< </span><span style=color:#f07219>0 </span><span style=color:#3e999f>or </span><span>y </span><span style=color:#3e999f>< </span><span style=color:#f07219>0 </span><span style=color:#3e999f>or </span><span>x </span><span style=color:#3e999f>> </span><span style=color:#c82728>self</span><span>.width </span><span style=color:#3e999f>or </span><span>y </span><span style=color:#3e999f>> </span><span style=color:#c82728>self</span><span>.height:
+</span><span>        </span><span style=color:#8959a8>return </span><span style=color:#f07219>False
+</span><span>    </span><span style=color:#8959a8>else</span><span>:
+</span><span>        </span><span style=color:#8e908c># иначе проверяем нашу коллекцию
+</span><span>        </span><span style=color:#8959a8>return </span><span>(x, y) </span><span style=color:#3e999f>in </span><span style=color:#c82728>self</span><span>.cell
+</span><span>
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>set</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>x</span><span>, </span><span style=color:#f07219>y</span><span>):
+</span><span>    </span><span style=color:#8e908c># элементарное добавление элемента
+</span><span>    </span><span style=color:#c82728>self</span><span style=color:#4271ae>.cell.</span><span style=color:#c82728>add</span><span style=color:#4271ae>((x, y))
+</span><span>
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>next</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>rule</span><span>):
+</span><span>    </span><span style=color:#8e908c># не хочу писать два цикла, а хочу один!
+</span><span>    </span><span style=color:#8959a8>from </span><span>itertools </span><span style=color:#8959a8>import </span><span>product
+</span><span>    </span><span style=color:#8e908c># создаём новую коллекцию
+</span><span>    new_cell </span><span style=color:#3e999f>= </span><span style=color:#c99e00>set</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># проходим по всем сетке
+</span><span>    </span><span style=color:#8959a8>for </span><span>x, y </span><span style=color:#8959a8>in </span><span style=color:#c82728>product</span><span style=color:#4271ae>(range(</span><span style=color:#f07219>0</span><span style=color:#4271ae>, </span><span style=color:#c82728>self</span><span style=color:#4271ae>.width), range(</span><span style=color:#f07219>0</span><span style=color:#4271ae>, </span><span style=color:#c82728>self</span><span style=color:#4271ae>.height))</span><span>:
+</span><span>        </span><span style=color:#8e908c># если правило выполнилось для xy
+</span><span>        </span><span style=color:#8959a8>if </span><span style=color:#c82728>rule</span><span style=color:#4271ae>(</span><span style=color:#c82728>self</span><span style=color:#4271ae>.get, x, y)</span><span>:
+</span><span>            </span><span style=color:#8e908c># то активируем её
+</span><span>            </span><span style=color:#4271ae>new_cell.</span><span style=color:#c82728>add</span><span style=color:#4271ae>((x, y))
+</span><span>    </span><span style=color:#8e908c># заменяем старую коллекцию на новую
+</span><span>    </span><span style=color:#c82728>self</span><span>.cell </span><span style=color:#3e999f>= </span><span>new_cell
+</span><span>
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>__str__</span><span>(</span><span style=color:#f07219>self</span><span>):
+</span><span>    result </span><span style=color:#3e999f>= </span><span style=color:#839c00>''
+</span><span>    </span><span style=color:#8e908c># проходимся по всем элементам сетки
+</span><span>    </span><span style=color:#8959a8>for </span><span>y </span><span style=color:#8959a8>in </span><span style=color:#4271ae>range(</span><span style=color:#f07219>0</span><span style=color:#4271ae>, </span><span style=color:#c82728>self</span><span style=color:#4271ae>.height)</span><span>:
+</span><span>        </span><span style=color:#8959a8>for </span><span>x </span><span style=color:#8959a8>in </span><span style=color:#4271ae>range(</span><span style=color:#f07219>0</span><span style=color:#4271ae>, </span><span style=color:#c82728>self</span><span style=color:#4271ae>.width)</span><span>:
+</span><span>            </span><span style=color:#8e908c># и если ячейка активна, то это '#'
+</span><span>            </span><span style=color:#8959a8>if </span><span style=color:#c82728>self</span><span style=color:#4271ae>.</span><span style=color:#c82728>get</span><span style=color:#4271ae>(x, y)</span><span>:
+</span><span>                result </span><span style=color:#3e999f>+= </span><span style=color:#839c00>'#'
+</span><span>            </span><span style=color:#8959a8>else</span><span>:
+</span><span>                </span><span style=color:#8e908c># иначе '.'
+</span><span>                result </span><span style=color:#3e999f>+= </span><span style=color:#839c00>'.'
+</span><span>        </span><span style=color:#8e908c># не забываем про переносы
+</span><span>        </span><span style=color:#8959a8>if </span><span>y </span><span style=color:#3e999f>!= </span><span style=color:#c82728>self</span><span>.width </span><span style=color:#3e999f>- </span><span style=color:#f07219>1</span><span>:
+</span><span>            result </span><span style=color:#3e999f>+= </span><span style=color:#839c00>'</span><span style=color:#f07219>\n</span><span style=color:#839c00>'
+</span><span>    </span><span style=color:#8959a8>return </span><span>result
+</span></code></pre><h1 id=zakliuchenie>Заключение</h1><p>А на этом сегодня всё. Исходники на нескольких языках забирать <a href=https://gist.github.com/FreeCX/d07e5cbf035bac095616de17e9046c8b>здесь</a>.<p>Если у меня в ближайшее время не появиться новая интересная задачка, то увидимся ещё не скоро :)<h1 id=poleznye-ssylki>Полезные ссылки</h1><ol><li><a href=https://ru.wikipedia.org/wiki/%D0%9A%D0%BB%D0%B5%D1%82%D0%BE%D1%87%D0%BD%D1%8B%D0%B9_%D0%B0%D0%B2%D1%82%D0%BE%D0%BC%D0%B0%D1%82>Клеточный автомат</a><li><a href=https://ru.wikipedia.org/wiki/%D0%9F%D1%80%D0%B0%D0%B2%D0%B8%D0%BB%D0%BE_30>Правило 30</a><li><a href=https://habr.com/ru/post/455958/>Эволюционирующие клеточные автоматы</a></ol></article><div class=back><a href=https://freecx.github.io/>Назад</a></div><div class=footer><span>Также читайте <a title="ты сам сломал ссылку, так что ничего личного" href=https://antoniii.github.io/> <s>antoniii</s> </a> <a href=https://citrux.github.io/>citrux</a> <a href=https://sputnikas.github.io/>sputnikas</a> </span></div><script>let msg=` А спонсор статей в моём блоге -- моя лень -- спонсор статей.`;[`=`.repeat(msg.length+ 1),msg,`=`.repeat(msg.length+ 1)].forEach(a=>console.warn(a))</script>

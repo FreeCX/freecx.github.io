@@ -1,0 +1,299 @@
+<!doctype html><html lang=ru><head><meta charset=utf-8><meta content="IE=edge" http-equiv=X-UA-Compatible><meta content="width=device-width,initial-scale=1" name=viewport><title>Геймдев? Легко!</title><meta content="Кодерный понедельник" name=description><meta content=https://freecx.github.io/touch-icon.png property=og:image><link href=https://code.cdn.mozilla.net/fonts/fira.css rel=stylesheet><link href=https://freecx.github.io/favicon.png rel=icon><link href=https://freecx.github.io/touch-icon.png rel=apple-touch-icon><link href=https://freecx.github.io/main.css rel=stylesheet><link href=https://freecx.github.io/syntax.css rel=stylesheet><body><aside class=logo><a href=https://github.com/FreeCX> <img class=gravatar src=https://freecx.github.io/avatar.png> </a><span class=logo-prompt>Я на github</span></aside><article><div class=center><h1>Геймдев? Легко!</h1><time>27 March 2023</time></div><div class=divider></div><p>Всем привет.<p>Я, как обычно, успешно забил на написание статей для блога. Ещё бы чуть-чуть и статья бы вышла ровно через год от предыдущей.<p>Но не будем впустую разглагольствовать и перейдём непосредственно к самой статье.<h1 id=vvedenie>Введение</h1><p>Сегодня я хочу приоткрыть форточку в геймдев и сделаю это через реализацию простой демки на <a href=https://godotengine.org/>Godot</a>.<p>С каждым годом вкатиться в геймдев становиться всё проще и проще… нужно всего-то поступить на курс геймдев разра… блин, не тот текст. Но вообще вход в игровую разработку и правда стал довольно простым делом.<p>Если вы думаете что в этой статье будет много картинок и я буду в интерфейсе перетаскивать ноды, то для вас у меня плохая новость — будем делать всё кодом!<p>Я бы не был бы собой, если начал пихать кучу картинок в статью о программировании, если это конечно не статья про генерацию картинок.<p>Поэтому в статье будет не совсем классический подход к разработке на Godot, а точнее на <a href=https://docs.godotengine.org/en/stable/tutorials/scripting/gd/index.html>gd</a>.<p>Погнали!<h1 id=ideia>Идея</h1><p>Надеюсь вы немного уже почитали про <a href=https://godotengine.org/>сам движок</a> и заглянули в <a href=https://docs.godotengine.org/en/stable/>документацию</a> к нему, но если нет, то можете посмотреть <a href="https://www.youtube.com/watch?v=YiE9tcoCfhE">вот это видео</a>. Больше информации о разработке на движке можете найти <a href=https://docs.godotengine.org/en/stable/community/tutorials.html#doc-community-tutorials>вот на этой странице</a>.<p>Вообще я бы посоветовал почитать <a href=https://docs.godotengine.org/en/stable/tutorials/best_practices/index.html>best practices</a>, перед началом разработки своей игры, но в нашем случае мы обойдёмся только информацией по <a href=https://docs.godotengine.org/en/stable/classes/index.html>API движка</a>.<p>Демка у нас будет простая — соберём стену из кубиков и будем в неё стрелять другим кубиком.<p>Обрисуем общий план, а потом пойдём писать код.<p>План на демку у нас следующий:<ol><li>создать границы игрового мира<li>расставить кубы<li>расставить свет<li>поставить камеру<li>добавить интерактив<li>...<li>PROFIT?</ol><h1 id=realizatsiia>Реализация</h1><p>Итак проект создан и мы имеем базовую 3d сцену с головной нодой. Нужно только прикрепить скрипт к головной ноде и можно начинать.<p>И нас тут же встречает базовый код<pre class=language-gd data-lang=gd style=color:#111;background-color:#f9f9f9><code class=language-gd data-lang=gd><span style=color:#8e908c># наследуемся от базовой ноды для 3D
+</span><span style=color:#8959a8>extends</span><span style=color:#839c00> Node3D
+</span><span>
+</span><span style=color:#8e908c># начальная инициализация
+</span><span style=color:#8959a8>func </span><span style=color:#4271ae>_ready</span><span>():
+</span><span>    </span><span style=color:#8959a8>pass
+</span><span>
+</span><span style=color:#8e908c># обработка логики зависящей от времени
+</span><span style=color:#8959a8>func </span><span style=color:#4271ae>_process</span><span>(</span><span style=color:#f07219>delta</span><span>):
+</span><span>    </span><span style=color:#8959a8>pass
+</span></code></pre><p>Сначала опишем наше верхнеуровневое представление, а далее будем постепенно реализовывать недостающие куски кода.<pre class=language-gd data-lang=gd style=color:#111;background-color:#f9f9f9><code class=language-gd data-lang=gd><span style=color:#8959a8>func </span><span style=color:#4271ae>_ready</span><span>():
+</span><span>    </span><span style=color:#8e908c># очистка сцены от текущих объектов
+</span><span>    </span><span style=color:#8959a8>for</span><span> n </span><span style=color:#3e999f>in </span><span style=color:#c82728>get_children</span><span style=color:#4271ae>()</span><span>:
+</span><span>        </span><span style=color:#c82728>remove_child</span><span style=color:#4271ae>(n)
+</span><span>        n.</span><span style=color:#c82728>queue_free</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># добавляем пол
+</span><span>    </span><span style=color:#c82728>add_floor</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># добавляем стену из кубов
+</span><span>    </span><span style=color:#c82728>add_box_wall</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># добавляем камеру
+</span><span>    </span><span style=color:#c82728>add_camera</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># добавляем свет
+</span><span>    </span><span style=color:#c82728>add_light</span><span style=color:#4271ae>()
+</span></code></pre><p>Цикл, в начале кода используется для очистки сцены от уже созданных нод.<p>Чуть позже мы сможем его вызывать по нажатию клавиши и он будет использован для перезапуска демки.<p>Идём далее и следующая из недостающие частей — пол<pre class=language-gd data-lang=gd style=color:#111;background-color:#f9f9f9><code class=language-gd data-lang=gd><span style=color:#8e908c># функция создания текстуры checker (гугли что за текстура такая)
+</span><span style=color:#8959a8>func </span><span style=color:#4271ae>create_checker_texture</span><span>() </span><span style=color:#3e999f>-> </span><span style=color:#c99e00>ImageTexture</span><span>:
+</span><span>    </span><span style=color:#8e908c># создаём наш холст
+</span><span>    </span><span style=color:#8959a8>var </span><span style=color:#c82728>image </span><span style=color:#3e999f>= </span><span style=color:#8959a8>Image</span><span>.</span><span style=color:#c82728>create</span><span style=color:#4271ae>(</span><span style=color:#f07219>512</span><span style=color:#4271ae>, </span><span style=color:#f07219>512</span><span style=color:#4271ae>, false, </span><span style=color:#8959a8>Image</span><span style=color:#4271ae>.FORMAT_RGBA8)
+</span><span>    </span><span style=color:#8e908c># заливаем его в чёрный цвет
+</span><span>    image.</span><span style=color:#c82728>fill</span><span style=color:#4271ae>(</span><span style=color:#8959a8>Color</span><span style=color:#4271ae>.BLACK)
+</span><span>    </span><span style=color:#8e908c># закрашиваем два квадрата белым цветом
+</span><span>    image.</span><span style=color:#c82728>fill_rect</span><span style=color:#4271ae>(</span><span style=color:#c82728>Rect2i</span><span style=color:#4271ae>(</span><span style=color:#f07219>0</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>, </span><span style=color:#f07219>256</span><span style=color:#4271ae>, </span><span style=color:#f07219>256</span><span style=color:#4271ae>)</span><span>, </span><span style=color:#8959a8>Color</span><span>.WHITE)
+</span><span>    image.</span><span style=color:#c82728>fill_rect</span><span style=color:#4271ae>(</span><span style=color:#c82728>Rect2i</span><span style=color:#4271ae>(</span><span style=color:#f07219>256</span><span style=color:#4271ae>, </span><span style=color:#f07219>256</span><span style=color:#4271ae>, </span><span style=color:#f07219>256</span><span style=color:#4271ae>, </span><span style=color:#f07219>256</span><span style=color:#4271ae>)</span><span>, </span><span style=color:#8959a8>Color</span><span>.WHITE)
+</span><span>    </span><span style=color:#8e908c># генерим из картинки текстуру
+</span><span>    </span><span style=color:#8959a8>return</span><span> ImageTexture.</span><span style=color:#c82728>create_from_image</span><span style=color:#4271ae>(image)
+</span><span>
+</span><span>
+</span><span style=color:#8959a8>func </span><span style=color:#4271ae>add_floor</span><span>():
+</span><span>    </span><span style=color:#8e908c># создадим материал для нашего пола
+</span><span>    </span><span style=color:#8959a8>var </span><span style=color:#c82728>floor_material </span><span style=color:#3e999f>=</span><span> StandardMaterial3D.</span><span style=color:#c82728>new</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># альбедо - основной цвет
+</span><span>    floor_material.albedo_texture </span><span style=color:#3e999f>= </span><span style=color:#c82728>create_checker_texture</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># увеличим число повторений текстуры
+</span><span>    floor_material.uv1_scale </span><span style=color:#3e999f>= </span><span style=color:#f07219>20 </span><span style=color:#3e999f>* </span><span style=color:#8959a8>Vector3</span><span style=color:#4271ae>(</span><span style=color:#f07219>1</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>)
+</span><span>
+</span><span>    </span><span style=color:#8e908c># создадим меш нашего пола в виде плоскости
+</span><span>    </span><span style=color:#8959a8>var </span><span style=color:#c82728>floor_mesh </span><span style=color:#3e999f>=</span><span> PlaneMesh.</span><span style=color:#c82728>new</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># добавим к нему ранее созданный материал
+</span><span>    floor_mesh.material </span><span style=color:#3e999f>=</span><span> floor_material
+</span><span>
+</span><span>    </span><span style=color:#8e908c># и завернём наш меш в MeshInstance
+</span><span>    </span><span style=color:#8959a8>var </span><span style=color:#c82728>floor_mesh_inst </span><span style=color:#3e999f>=</span><span> MeshInstance3D.</span><span style=color:#c82728>new</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># сюда масштаб меша запишем
+</span><span>    floor_mesh_inst.scale </span><span style=color:#3e999f>= </span><span style=color:#8959a8>Vector3</span><span style=color:#4271ae>(</span><span style=color:#f07219>3</span><span style=color:#4271ae>, </span><span style=color:#f07219>3</span><span style=color:#4271ae>, </span><span style=color:#f07219>3</span><span style=color:#4271ae>)
+</span><span>    </span><span style=color:#8e908c># и сам меш
+</span><span>    floor_mesh_inst.mesh </span><span style=color:#3e999f>=</span><span> floor_mesh
+</span><span>
+</span><span>    </span><span style=color:#8e908c># создадим ноду определения коллизии
+</span><span>    </span><span style=color:#8959a8>var </span><span style=color:#c82728>floor_collision </span><span style=color:#3e999f>=</span><span> CollisionShape3D.</span><span style=color:#c82728>new</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># и выставим форму коллизии в виде бесконечной плоскости
+</span><span>    floor_collision.shape </span><span style=color:#3e999f>=</span><span> WorldBoundaryShape3D.</span><span style=color:#c82728>new</span><span style=color:#4271ae>()
+</span><span>
+</span><span>    </span><span style=color:#8e908c># теперь же остаётся создать статический объект
+</span><span>    </span><span style=color:#8959a8>var </span><span style=color:#c82728>floor_obj </span><span style=color:#3e999f>=</span><span> StaticBody3D.</span><span style=color:#c82728>new</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># добавить в него ноду коллизии
+</span><span>    floor_obj.</span><span style=color:#c82728>add_child</span><span style=color:#4271ae>(floor_collision)
+</span><span>    </span><span style=color:#8e908c># меш
+</span><span>    floor_obj.</span><span style=color:#c82728>add_child</span><span style=color:#4271ae>(floor_mesh_inst)
+</span><span>
+</span><span>    </span><span style=color:#8e908c># и можно добавлять на сцену
+</span><span>    </span><span style=color:#c82728>add_child</span><span style=color:#4271ae>(floor_obj)
+</span></code></pre><p>Если на данном этапе попробовать запустить демку, то мы ничего не увидим, а всё из-за того что у нас отсутствует виртуальная камера.<p>Добавим же её<pre class=language-gd data-lang=gd style=color:#111;background-color:#f9f9f9><code class=language-gd data-lang=gd><span style=color:#8959a8>func </span><span style=color:#4271ae>add_camera</span><span>():
+</span><span>    </span><span style=color:#8e908c># создаём ноду самой камеры
+</span><span>    </span><span style=color:#8959a8>var </span><span style=color:#c82728>cam </span><span style=color:#3e999f>=</span><span> Camera3D.</span><span style=color:#c82728>new</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># делаем камеру главной
+</span><span>    cam.</span><span style=color:#c82728>make_current</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># добавляем на сцену
+</span><span>    </span><span style=color:#c82728>add_child</span><span style=color:#4271ae>(cam)
+</span></code></pre><p>Теперь же можно даже запустить и посмотреть, что у нас получилось, если конечно не забыть закомментировать отсутствующие функции.<p>Конечно на вид так себе, но уже что-то работающее.<p>Внесём немного света в эту мрачную атмосферу добавив пару источников<pre class=language-gd data-lang=gd style=color:#111;background-color:#f9f9f9><code class=language-gd data-lang=gd><span style=color:#8959a8>func </span><span style=color:#4271ae>add_light</span><span>():
+</span><span>    </span><span style=color:#8e908c># обойдёмся несколькими неподвижными источниками света
+</span><span>    </span><span style=color:#c82728>add_child</span><span style=color:#4271ae>(</span><span style=color:#c82728>create_light</span><span style=color:#4271ae>(</span><span style=color:#8959a8>Vector3</span><span style=color:#4271ae>(</span><span style=color:#3e999f>-</span><span style=color:#f07219>1.5</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>, </span><span style=color:#f07219>2</span><span style=color:#4271ae>)</span><span>))
+</span><span>    </span><span style=color:#c82728>add_child</span><span style=color:#4271ae>(</span><span style=color:#c82728>create_light</span><span style=color:#4271ae>(</span><span style=color:#8959a8>Vector3</span><span style=color:#4271ae>(</span><span style=color:#f07219>1.5</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>, </span><span style=color:#f07219>2</span><span style=color:#4271ae>)</span><span>))
+</span><span>
+</span><span style=color:#8e908c># вспомогательная функцию для определения одного источника света
+</span><span style=color:#8959a8>func </span><span style=color:#4271ae>create_light</span><span>(</span><span style=color:#f07219>pos</span><span>: </span><span style=color:#f07219>Vector3</span><span>) </span><span style=color:#3e999f>-> </span><span style=color:#c99e00>Light3D</span><span>:
+</span><span>    </span><span style=color:#8e908c># создаём источник света
+</span><span>    </span><span style=color:#8959a8>var </span><span style=color:#c82728>object </span><span style=color:#3e999f>=</span><span> OmniLight3D.</span><span style=color:#c82728>new</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># выставляем позицию
+</span><span>    object.position </span><span style=color:#3e999f>=</span><span> pos
+</span><span>    </span><span style=color:#8e908c># включаем поддержку теней
+</span><span>    object.shadow_enabled </span><span style=color:#3e999f>= </span><span style=color:#f07219>true
+</span><span>    </span><span style=color:#8959a8>return</span><span> object
+</span></code></pre><p>Не забудьте раскомментировать вызывающий код чтобы увидеть изменения.<p>Остаётся определить функцию ответственную за создание стены из кубов и демка готова.<pre class=language-gd data-lang=gd style=color:#111;background-color:#f9f9f9><code class=language-gd data-lang=gd><span style=color:#8959a8>func </span><span style=color:#4271ae>add_box_wall</span><span>():
+</span><span>    </span><span style=color:#8e908c># немного констант для определения параметров стены
+</span><span>    </span><span style=color:#8959a8>const </span><span style=color:#c82728>x_count</span><span>: </span><span style=color:#8959a8>int </span><span style=color:#3e999f>= </span><span style=color:#f07219>42
+</span><span>    </span><span style=color:#8959a8>const </span><span style=color:#c82728>y_count</span><span>: </span><span style=color:#8959a8>int </span><span style=color:#3e999f>= </span><span style=color:#f07219>10
+</span><span>    </span><span style=color:#8959a8>const </span><span style=color:#c82728>start</span><span>: </span><span style=color:#8959a8>Vector3 </span><span style=color:#3e999f>= </span><span style=color:#8959a8>Vector3</span><span style=color:#4271ae>(</span><span style=color:#3e999f>-</span><span style=color:#f07219>2</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>)
+</span><span>    </span><span style=color:#8959a8>const </span><span style=color:#c82728>shift</span><span>: </span><span style=color:#8959a8>Vector3 </span><span style=color:#3e999f>= </span><span style=color:#8959a8>Vector3</span><span style=color:#4271ae>(</span><span style=color:#f07219>0.1</span><span style=color:#4271ae>, </span><span style=color:#f07219>0.1</span><span style=color:#4271ae>, </span><span style=color:#f07219>0.1</span><span style=color:#4271ae>)
+</span><span>    </span><span style=color:#8959a8>const </span><span style=color:#c82728>color</span><span>: </span><span style=color:#8959a8>Color </span><span style=color:#3e999f>= </span><span style=color:#8959a8>Color</span><span>.BURLYWOOD
+</span><span>
+</span><span>    </span><span style=color:#8959a8>var </span><span style=color:#c82728>p </span><span style=color:#3e999f>= </span><span style=color:#8959a8>Vector3</span><span>.ZERO
+</span><span>    </span><span style=color:#8e908c># будем создавать кубы рядами
+</span><span>    </span><span style=color:#8959a8>for</span><span> y </span><span style=color:#3e999f>in </span><span style=color:#c82728>range</span><span style=color:#4271ae>(y_count)</span><span>:
+</span><span>        </span><span style=color:#8e908c># выставим начально положение по x
+</span><span>        p.x </span><span style=color:#3e999f>=</span><span> start.x </span><span style=color:#3e999f>+ </span><span style=color:#4271ae>(shift.x </span><span style=color:#3e999f>* </span><span style=color:#f07219>0.1</span><span style=color:#4271ae>)
+</span><span>        </span><span style=color:#8959a8>for</span><span> x </span><span style=color:#3e999f>in </span><span style=color:#c82728>range</span><span style=color:#4271ae>(x_count)</span><span>:
+</span><span>            </span><span style=color:#8e908c># добавим созданный куб сразу на сцену
+</span><span>            </span><span style=color:#c82728>add_child</span><span style=color:#4271ae>(</span><span style=color:#c82728>create_box</span><span style=color:#4271ae>(p, shift, color)</span><span>)
+</span><span>            </span><span style=color:#8e908c># увеличим позицию по x
+</span><span>            p.x </span><span style=color:#3e999f>=</span><span> start.x </span><span style=color:#3e999f>+</span><span> shift.x </span><span style=color:#3e999f>*</span><span> x
+</span><span>        </span><span style=color:#8e908c># а после окончания цикла - по y
+</span><span>        p.y </span><span style=color:#3e999f>+=</span><span> shift.y </span><span style=color:#3e999f>* </span><span style=color:#f07219>1.01
+</span><span>
+</span><span style=color:#8e908c># вспомогательная функция создания одно куба
+</span><span style=color:#8959a8>func </span><span style=color:#4271ae>create_box</span><span>(</span><span style=color:#f07219>pos</span><span>: </span><span style=color:#f07219>Vector3</span><span>, </span><span style=color:#f07219>size</span><span>: </span><span style=color:#f07219>Vector3</span><span>, </span><span style=color:#f07219>color</span><span>: </span><span style=color:#f07219>Color</span><span>):
+</span><span>    </span><span style=color:#8e908c># создадим стандартный материал
+</span><span>    </span><span style=color:#8959a8>var </span><span style=color:#c82728>box_material </span><span style=color:#3e999f>=</span><span> StandardMaterial3D.</span><span style=color:#c82728>new</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># и зададим только цвет
+</span><span>    box_material.albedo_color </span><span style=color:#3e999f>=</span><span> color
+</span><span>
+</span><span>    </span><span style=color:#8e908c># создадим меш коробки
+</span><span>    </span><span style=color:#8959a8>var </span><span style=color:#c82728>box_mesh </span><span style=color:#3e999f>=</span><span> BoxMesh.</span><span style=color:#c82728>new</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># и присвоим ему ранее созданный материал
+</span><span>    box_mesh.material </span><span style=color:#3e999f>=</span><span> box_material
+</span><span>
+</span><span>    </span><span style=color:#8e908c># создадим MeshInstance
+</span><span>    </span><span style=color:#8959a8>var </span><span style=color:#c82728>box_mesh_inst </span><span style=color:#3e999f>=</span><span> MeshInstance3D.</span><span style=color:#c82728>new</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># поместим в него меш коробки
+</span><span>    box_mesh_inst.mesh </span><span style=color:#3e999f>=</span><span> box_mesh
+</span><span>    </span><span style=color:#8e908c># и зададим масштаб
+</span><span>    box_mesh_inst.scale </span><span style=color:#3e999f>=</span><span> size
+</span><span>
+</span><span>    </span><span style=color:#8e908c># создадим ноду определения коллизии
+</span><span>    </span><span style=color:#8959a8>var </span><span style=color:#c82728>box_collision </span><span style=color:#3e999f>=</span><span> CollisionShape3D.</span><span style=color:#c82728>new</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># и выставим для него форму коробки
+</span><span>    box_collision.shape </span><span style=color:#3e999f>=</span><span> BoxShape3D.</span><span style=color:#c82728>new</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># и также зададим масштаб
+</span><span>    box_collision.scale </span><span style=color:#3e999f>=</span><span> size
+</span><span>
+</span><span>    </span><span style=color:#8e908c># остаётся только создать твёрдое тело
+</span><span>    </span><span style=color:#8959a8>var </span><span style=color:#c82728>box_obj </span><span style=color:#3e999f>=</span><span> RigidBody3D.</span><span style=color:#c82728>new</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># выставим ему позицию на сцене
+</span><span>    box_obj.position </span><span style=color:#3e999f>=</span><span> pos
+</span><span>    </span><span style=color:#8e908c># добавить коллизию
+</span><span>    box_obj.</span><span style=color:#c82728>add_child</span><span style=color:#4271ae>(box_collision)
+</span><span>    </span><span style=color:#8e908c># и меш
+</span><span>    box_obj.</span><span style=color:#c82728>add_child</span><span style=color:#4271ae>(box_mesh_inst)
+</span><span>
+</span><span>    </span><span style=color:#8e908c># и можно возращать готовый объект
+</span><span>    </span><span style=color:#8959a8>return</span><span> box_obj
+</span></code></pre><p>Почти всё готово, осталось только добавить выстрел кубом в сгенерированную стену.<pre class=language-gd data-lang=gd style=color:#111;background-color:#f9f9f9><code class=language-gd data-lang=gd><span style=color:#8e908c># функция обработки пользовательского ввода
+</span><span style=color:#8959a8>func </span><span style=color:#4271ae>_input</span><span>(</span><span style=color:#f07219>event</span><span>):
+</span><span>    </span><span style=color:#8e908c># будем обрабатывать только события от клавиатуры
+</span><span>    </span><span style=color:#8959a8>if</span><span> event </span><span style=color:#3e999f>is</span><span> InputEventKey:
+</span><span>        </span><span style=color:#8e908c># не забудь забиндить действие shoot в Input Map на кнопку
+</span><span>        </span><span style=color:#8e908c># Project -> Project Settings... -> Input Map
+</span><span>        </span><span style=color:#8959a8>if</span><span> event.</span><span style=color:#c82728>is_action_pressed</span><span style=color:#4271ae>(</span><span style=color:#839c00>"shoot"</span><span style=color:#4271ae>)</span><span>:
+</span><span>            </span><span style=color:#8e908c># выстрел кубом
+</span><span>            </span><span style=color:#c82728>bang</span><span style=color:#4271ae>()
+</span><span>        </span><span style=color:#8e908c># и тут, кстати, можно добавить пересоздание сцены
+</span><span>        </span><span style=color:#8959a8>if</span><span> event.</span><span style=color:#c82728>is_action_released</span><span style=color:#4271ae>(</span><span style=color:#839c00>"reset"</span><span style=color:#4271ae>)</span><span>:
+</span><span>            </span><span style=color:#c82728>_ready</span><span style=color:#4271ae>()
+</span><span>
+</span><span style=color:#8e908c># вспомогательная функцию инициализация куба для стрельбы
+</span><span style=color:#8959a8>func </span><span style=color:#4271ae>bang</span><span>():
+</span><span>    </span><span style=color:#8e908c># позиция куба будет в этих границах
+</span><span>    </span><span style=color:#8959a8>var </span><span style=color:#c82728>xr </span><span style=color:#3e999f>= </span><span style=color:#c82728>randf_range</span><span style=color:#4271ae>(</span><span style=color:#3e999f>-</span><span style=color:#f07219>2</span><span style=color:#4271ae>, </span><span style=color:#f07219>2</span><span style=color:#4271ae>)
+</span><span>    </span><span style=color:#8e908c># а размер куба будет в этих
+</span><span>    </span><span style=color:#8959a8>var </span><span style=color:#c82728>size </span><span style=color:#3e999f>= </span><span style=color:#c82728>randf_range</span><span style=color:#4271ae>(</span><span style=color:#f07219>0.1</span><span style=color:#4271ae>, </span><span style=color:#f07219>0.4</span><span style=color:#4271ae>)
+</span><span>    </span><span style=color:#8e908c># создаём наш куб
+</span><span>    </span><span style=color:#8959a8>var </span><span style=color:#c82728>box </span><span style=color:#3e999f>= </span><span style=color:#c82728>create_box</span><span style=color:#4271ae>(</span><span style=color:#8959a8>Vector3</span><span style=color:#4271ae>(xr, </span><span style=color:#f07219>0.8</span><span style=color:#4271ae>, </span><span style=color:#3e999f>-</span><span style=color:#f07219>3</span><span style=color:#4271ae>)</span><span>, </span><span style=color:#8959a8>Vector3</span><span style=color:#4271ae>(size, size, size)</span><span>, </span><span style=color:#8959a8>Color</span><span>.CRIMSON)
+</span><span>    </span><span style=color:#8e908c># выставляем случайный угол поворота
+</span><span>    box.rotation_degrees </span><span style=color:#3e999f>= </span><span style=color:#8959a8>Vector3</span><span style=color:#4271ae>(</span><span style=color:#c82728>randi_range</span><span style=color:#4271ae>(</span><span style=color:#f07219>0</span><span style=color:#4271ae>, </span><span style=color:#f07219>360</span><span style=color:#4271ae>)</span><span>, </span><span style=color:#c82728>randi_range</span><span style=color:#4271ae>(</span><span style=color:#f07219>0</span><span style=color:#4271ae>, </span><span style=color:#f07219>360</span><span style=color:#4271ae>)</span><span>, </span><span style=color:#c82728>randi_range</span><span style=color:#4271ae>(</span><span style=color:#f07219>0</span><span style=color:#4271ae>, </span><span style=color:#f07219>360</span><span style=color:#4271ae>)</span><span>)
+</span><span>    </span><span style=color:#8e908c># выставляем массу
+</span><span>    box.mass </span><span style=color:#3e999f>= </span><span style=color:#f07219>10
+</span><span>    </span><span style=color:#8e908c># добавляем импульс к созданному кубу
+</span><span>    box.</span><span style=color:#c82728>apply_impulse</span><span style=color:#4271ae>(</span><span style=color:#8959a8>Vector3</span><span style=color:#4271ae>(</span><span style=color:#f07219>0</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>, </span><span style=color:#f07219>15</span><span style=color:#4271ae>)</span><span>)
+</span><span>    </span><span style=color:#8e908c># добавляем на сцену
+</span><span>    </span><span style=color:#c82728>add_child</span><span style=color:#4271ae>(box)
+</span></code></pre><p>В принципе на этом можно было и закончить создание демки, так как по сути реализовали всё что задумывали, но мне кажется что как-то мало интерактива в нашей демке.<p>Давайте же добавим управление камерой, чтобы можно было наблюдать физику кубов с почти любого ракурса.<p>Для этого необходимо создать новый скрипт, я назвал его <code>rotator</code>, где определим вот это<pre class=language-gd data-lang=gd style=color:#111;background-color:#f9f9f9><code class=language-gd data-lang=gd><span style=color:#8959a8>extends</span><span style=color:#839c00> Node3D
+</span><span>class_name Rotator
+</span><span>
+</span><span>
+</span><span style=color:#8e908c># наши любимые глобальные переменные
+</span><span>
+</span><span style=color:#8e908c># начальный угол поворота
+</span><span style=color:#8959a8>var </span><span style=color:#c82728>_shift_angle</span><span>: </span><span style=color:#8959a8>float </span><span style=color:#3e999f>=</span><span> PI </span><span style=color:#3e999f>/ </span><span style=color:#f07219>2
+</span><span style=color:#8e908c># текущий угол
+</span><span style=color:#8959a8>var </span><span style=color:#c82728>_angle</span><span>: </span><span style=color:#8959a8>float </span><span style=color:#3e999f>= </span><span style=color:#f07219>0
+</span><span style=color:#8e908c># расстояние от центра
+</span><span style=color:#8959a8>var </span><span style=color:#c82728>_radius</span><span>: </span><span style=color:#8959a8>float </span><span style=color:#3e999f>= </span><span style=color:#f07219>0
+</span><span>
+</span><span>
+</span><span style=color:#8e908c># конструктор
+</span><span style=color:#8959a8>func </span><span style=color:#4271ae>_init</span><span>(</span><span style=color:#f07219>angle</span><span>: </span><span style=color:#f07219>int</span><span>, </span><span style=color:#f07219>radius</span><span>: </span><span style=color:#f07219>float</span><span>, </span><span style=color:#f07219>height</span><span>: </span><span style=color:#f07219>float</span><span>):
+</span><span>    _radius </span><span style=color:#3e999f>=</span><span> radius
+</span><span>    _angle </span><span style=color:#3e999f>= </span><span style=color:#c82728>deg_to_rad</span><span style=color:#4271ae>(angle)
+</span><span>    position.y </span><span style=color:#3e999f>=</span><span> height
+</span><span>
+</span><span>
+</span><span style=color:#8e908c># начальная инициализация
+</span><span style=color:#8959a8>func </span><span style=color:#4271ae>_ready</span><span>():
+</span><span>    </span><span style=color:#c82728>rotate_xz</span><span style=color:#4271ae>(</span><span style=color:#f07219>0</span><span style=color:#4271ae>)
+</span><span>
+</span><span>
+</span><span style=color:#8e908c># функция поворота камеры
+</span><span style=color:#8959a8>func </span><span style=color:#4271ae>rotate_xz</span><span>(</span><span style=color:#f07219>delta</span><span>: </span><span style=color:#f07219>float</span><span>):
+</span><span>    </span><span style=color:#8e908c># увеличиваем наш угол (fmod - тоже самое что и %, но для float)
+</span><span>    _angle </span><span style=color:#3e999f>= </span><span style=color:#c82728>fmod</span><span style=color:#4271ae>(_angle </span><span style=color:#3e999f>+</span><span style=color:#4271ae> delta, </span><span style=color:#f07219>2 </span><span style=color:#3e999f>*</span><span style=color:#4271ae> PI)
+</span><span>    </span><span style=color:#8e908c># позиция камеры в зависимости от угла
+</span><span>    position.x </span><span style=color:#3e999f>=</span><span> _radius </span><span style=color:#3e999f>* </span><span style=color:#c82728>cos</span><span style=color:#4271ae>(_angle)
+</span><span>    position.z </span><span style=color:#3e999f>=</span><span> _radius </span><span style=color:#3e999f>* </span><span style=color:#c82728>sin</span><span style=color:#4271ae>(_angle)
+</span><span>    </span><span style=color:#8e908c># и угол на который она повёрнута
+</span><span>    rotation.y </span><span style=color:#3e999f>=</span><span> _shift_angle </span><span style=color:#3e999f>-</span><span> _angle
+</span><span>
+</span><span>
+</span><span style=color:#8e908c># функция изменение радиуса
+</span><span style=color:#8959a8>func </span><span style=color:#4271ae>increment_radius</span><span>(</span><span style=color:#f07219>delta</span><span>: </span><span style=color:#f07219>float</span><span>):
+</span><span>    _radius </span><span style=color:#3e999f>+=</span><span> delta
+</span><span>    </span><span style=color:#c82728>rotate_xz</span><span style=color:#4271ae>(</span><span style=color:#f07219>0</span><span style=color:#4271ae>)
+</span><span>
+</span></code></pre><p>Этот код отвечает за расположение камеры на заданном расстоянии от центра. Также он задаёт угол поворота камеры, чтобы она всегда смотрела в центр сцены.<p>Так сцена всегда будет попадать в объектив виртуальной камеры.<p>Теперь же остаётся немного изменить код, связанный с камерой<pre class=language-gd data-lang=gd style=color:#111;background-color:#f9f9f9><code class=language-gd data-lang=gd><span style=color:#8e908c># значение на который будет изменяться угол/положение камеры
+</span><span style=color:#8959a8>const </span><span style=color:#c82728>dt</span><span>: </span><span style=color:#8959a8>float </span><span style=color:#3e999f>= </span><span style=color:#f07219>0.1
+</span><span style=color:#8e908c># глобальный объект управляющий камерой
+</span><span style=color:#8959a8>var </span><span style=color:#c82728>camera</span><span>: Rotator </span><span style=color:#3e999f>= </span><span style=color:#f07219>null
+</span><span>
+</span><span style=color:#8959a8>func </span><span style=color:#4271ae>add_camera</span><span>():
+</span><span>    </span><span style=color:#8e908c># создаём ноду управляющую камерой
+</span><span>    camera </span><span style=color:#3e999f>=</span><span> Rotator.</span><span style=color:#c82728>new</span><span style=color:#4271ae>(</span><span style=color:#f07219>90</span><span style=color:#4271ae>, </span><span style=color:#f07219>3</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>)
+</span><span>    </span><span style=color:#8e908c># создаём ноду самой камеры
+</span><span>    </span><span style=color:#8959a8>var </span><span style=color:#c82728>cam_obj </span><span style=color:#3e999f>=</span><span> Camera3D.</span><span style=color:#c82728>new</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># делаем камеру главной
+</span><span>    cam_obj.</span><span style=color:#c82728>make_current</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># добавляем её к управляющему объекту
+</span><span>    camera.</span><span style=color:#c82728>add_child</span><span style=color:#4271ae>(cam_obj)
+</span><span>    </span><span style=color:#8e908c># добавляем на сцену
+</span><span>    </span><span style=color:#c82728>add_child</span><span style=color:#4271ae>(camera)
+</span></code></pre><p>Стоит уточнить, что <code>child</code> объект всегда "наследует" от родителя положение в пространстве и поворот на угол, что очень удобно в нашем случае. Я специально написало слово в скобках, так как у <code>child</code> объекта может быть своё положение/поворот, но в локальной системе координат, относительно родительского объекта.<p>Не забываем добавить обработку новых действий<pre class=language-gd data-lang=gd style=color:#111;background-color:#f9f9f9><code class=language-gd data-lang=gd><span style=color:#8959a8>func </span><span style=color:#4271ae>_input</span><span>(</span><span style=color:#f07219>event</span><span>):
+</span><span>    </span><span style=color:#8e908c># будем обрабатывать только события от клавиатуры
+</span><span>    </span><span style=color:#8959a8>if</span><span> event </span><span style=color:#3e999f>is</span><span> InputEventKey:
+</span><span>        </span><span style=color:#8e908c># ... ранее определенный код ...
+</span><span>
+</span><span>        </span><span style=color:#8e908c># управление камерой
+</span><span>        </span><span style=color:#8959a8>if</span><span> event.</span><span style=color:#c82728>is_action</span><span style=color:#4271ae>(</span><span style=color:#839c00>"ui_left"</span><span style=color:#4271ae>)</span><span>:
+</span><span>            camera.</span><span style=color:#c82728>rotate_xz</span><span style=color:#4271ae>(dt)
+</span><span>        </span><span style=color:#8959a8>if</span><span> event.</span><span style=color:#c82728>is_action</span><span style=color:#4271ae>(</span><span style=color:#839c00>"ui_right"</span><span style=color:#4271ae>)</span><span>:
+</span><span>            camera.</span><span style=color:#c82728>rotate_xz</span><span style=color:#4271ae>(</span><span style=color:#3e999f>-</span><span style=color:#4271ae>dt)
+</span><span>        </span><span style=color:#8959a8>if</span><span> event.</span><span style=color:#c82728>is_action</span><span style=color:#4271ae>(</span><span style=color:#839c00>"ui_up"</span><span style=color:#4271ae>)</span><span>:
+</span><span>            camera.</span><span style=color:#c82728>increment_radius</span><span style=color:#4271ae>(</span><span style=color:#3e999f>-</span><span style=color:#4271ae>dt)
+</span><span>        </span><span style=color:#8959a8>if</span><span> event.</span><span style=color:#c82728>is_action</span><span style=color:#4271ae>(</span><span style=color:#839c00>"ui_down"</span><span style=color:#4271ae>)</span><span>:
+</span><span>            camera.</span><span style=color:#c82728>increment_radius</span><span style=color:#4271ae>(dt)
+</span></code></pre><p>Последнее, чтобы я ещё добавил — экран подсказки со списком клавиш.<pre class=language-gd data-lang=gd style=color:#111;background-color:#f9f9f9><code class=language-gd data-lang=gd><span style=color:#8e908c># глобальный объект для всплывающей подсказки
+</span><span style=color:#8959a8>var </span><span style=color:#c82728>splash</span><span>: Panel </span><span style=color:#3e999f>= </span><span style=color:#f07219>null
+</span><span>
+</span><span style=color:#8959a8>func </span><span style=color:#4271ae>_ready</span><span>():
+</span><span>    </span><span style=color:#8e908c># ... ранее определенный код ...
+</span><span>    </span><span style=color:#8e908c># добавляем экран с информацией
+</span><span>    </span><span style=color:#c82728>add_splash_screen</span><span style=color:#4271ae>()
+</span><span>
+</span><span style=color:#8e908c># функция обработки пользовательского ввода
+</span><span style=color:#8959a8>func </span><span style=color:#4271ae>_input</span><span>(</span><span style=color:#f07219>event</span><span>):
+</span><span>    </span><span style=color:#8e908c># будем обрабатывать только события от клавиатуры
+</span><span>    </span><span style=color:#8959a8>if</span><span> event </span><span style=color:#3e999f>is</span><span> InputEventKey:
+</span><span>        </span><span style=color:#8e908c># ... ранее определенный код ...
+</span><span>        </span><span style=color:#8e908c># открыть/закрыть подсказку по клавишам
+</span><span>        </span><span style=color:#8959a8>if</span><span> event.</span><span style=color:#c82728>is_action_pressed</span><span style=color:#4271ae>(</span><span style=color:#839c00>"splash"</span><span style=color:#4271ae>)</span><span>:
+</span><span>            splash.visible </span><span style=color:#3e999f>=</span><span> !splash.visible
+</span><span>
+</span><span style=color:#8959a8>func </span><span style=color:#4271ae>add_splash_screen</span><span>():
+</span><span>    </span><span style=color:#8e908c># добавляем 2D ноду с полупрозрачной панелью
+</span><span>    splash </span><span style=color:#3e999f>=</span><span> Panel.</span><span style=color:#c82728>new</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># определенного размера
+</span><span>    splash.</span><span style=color:#c82728>set_size</span><span style=color:#4271ae>(</span><span style=color:#8959a8>Vector2</span><span style=color:#4271ae>(</span><span style=color:#f07219>300</span><span style=color:#4271ae>, </span><span style=color:#f07219>200</span><span style=color:#4271ae>)</span><span>)
+</span><span>    </span><span style=color:#8e908c># и располагаем её по центру экрана
+</span><span>    splash.</span><span style=color:#c82728>set_anchors_and_offsets_preset</span><span style=color:#4271ae>(Control.PRESET_CENTER, Control.PRESET_MODE_KEEP_SIZE)
+</span><span>
+</span><span>    </span><span style=color:#8e908c># добавляем текст с подсказой
+</span><span>    </span><span style=color:#8959a8>var </span><span style=color:#c82728>label </span><span style=color:#3e999f>=</span><span> RichTextLabel.</span><span style=color:#c82728>new</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># выставляем размер
+</span><span>    label.</span><span style=color:#c82728>set_size</span><span style=color:#4271ae>(</span><span style=color:#8959a8>Vector2</span><span style=color:#4271ae>(</span><span style=color:#f07219>300</span><span style=color:#4271ae>, </span><span style=color:#f07219>150</span><span style=color:#4271ae>)</span><span>)
+</span><span>    </span><span style=color:#8e908c># и добавляем сам текст в формате BBCode
+</span><span>    label.</span><span style=color:#c82728>append_text</span><span style=color:#4271ae>(
+</span><span style=color:#4271ae>        </span><span style=color:#839c00>"""[p align=center][b]HELP MENU[/b]
+</span><span style=color:#839c00>[b][color=red]F1[/color][/b] show this help
+</span><span style=color:#839c00>[b][color=red]R[/color][/b] reset scene
+</span><span style=color:#839c00>[b][color=red]← →[/color][/b] rotate camera
+</span><span style=color:#839c00>[b][color=red]↑ ↓[/color][/b] move camera
+</span><span style=color:#839c00>[b][color=red]SPACE[/color][/b] shoot[/p]"""</span><span style=color:#4271ae>)
+</span><span>    </span><span style=color:#8e908c># центрируем текст
+</span><span>    label.</span><span style=color:#c82728>set_anchors_and_offsets_preset</span><span style=color:#4271ae>(Control.PRESET_CENTER, Control.PRESET_MODE_KEEP_SIZE)
+</span><span>
+</span><span>    </span><span style=color:#8e908c># тут уже должно быть и так понятно
+</span><span>    splash.</span><span style=color:#c82728>add_child</span><span style=color:#4271ae>(label)
+</span><span>    </span><span style=color:#c82728>add_child</span><span style=color:#4271ae>(splash)
+</span><span>
+</span><span>    </span><span style=color:#8e908c># запустим таймер автоскрытия
+</span><span>    await </span><span style=color:#c82728>get_tree</span><span style=color:#4271ae>()</span><span>.</span><span style=color:#c82728>create_timer</span><span style=color:#4271ae>(</span><span style=color:#f07219>3.0</span><span style=color:#4271ae>)</span><span>.timeout
+</span><span>    </span><span style=color:#8e908c># этот код выполниться после срабатывания таймера
+</span><span>    splash.visible </span><span style=color:#3e999f>= </span><span style=color:#f07219>false
+</span></code></pre><p>Всё, демка готова!<h1 id=zakliuchenie>Заключение</h1><p>Полный код доступен <a href=https://github.com/FreeCX/post-godot>в репозитории</a>.<p>Если интересен более классический подход к разработке игры на Godot, то посмотрите на проект <a href=https://github.com/FreeCX/billiard-with-guns>billiard-with-guns</a>.<p>Хоть игра и собрана криво, но вполне себе рабочая.<p>Ладно, до следующего раза.<p>Всем пока!<h1 id=poleznye-ssylki>Полезные ссылки</h1><ol><li><a href=https://godotengine.org/>Godot</a><li><a href=https://docs.godotengine.org/en/stable/>Godot Docs</a><li><a href=https://docs.godotengine.org/en/stable/tutorials/scripting/gd/index.html>gd</a><li><a href=https://docs.godotengine.org/en/3.2/tutorials/3d/fps_tutorial/index.html>FPS tutorial</a><li><a href="https://www.youtube.com/watch?v=YiE9tcoCfhE">Create Your First Complete 3D Game with Godot</a><li><a href=https://docs.godotengine.org/en/stable/community/tutorials.html#doc-community-tutorials>Tutorials and resources</a><li><a href=https://docs.godotengine.org/en/stable/tutorials/best_practices/index.html>Best practices</a><li><a href=https://docs.godotengine.org/en/stable/classes/index.html>Class reference</a><li><a href=https://github.com/FreeCX/post-godot>Project source code</a><li><a href=https://github.com/FreeCX/billiard-with-guns>Billiard With Guns</a></ol></article><div class=back><a href=https://freecx.github.io/>Назад</a></div><div class=footer><span>Также читайте <a title="ты сам сломал ссылку, так что ничего личного" href=https://antoniii.github.io/> <s>antoniii</s> </a> <a href=https://citrux.github.io/>citrux</a> <a href=https://sputnikas.github.io/>sputnikas</a> </span></div><script>let msg=` А спонсор статей в моём блоге -- моя лень -- спонсор статей.`;[`=`.repeat(msg.length+ 1),msg,`=`.repeat(msg.length+ 1)].forEach(a=>console.warn(a))</script>

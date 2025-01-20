@@ -1,0 +1,265 @@
+<!doctype html><html lang=ru><head><meta charset=utf-8><meta content="IE=edge" http-equiv=X-UA-Compatible><meta content="width=device-width,initial-scale=1" name=viewport><title>Используем Docker</title><meta content="Кодерный понедельник" name=description><meta content=https://freecx.github.io/touch-icon.png property=og:image><link href=https://code.cdn.mozilla.net/fonts/fira.css rel=stylesheet><link href=https://freecx.github.io/favicon.png rel=icon><link href=https://freecx.github.io/touch-icon.png rel=apple-touch-icon><link href=https://freecx.github.io/main.css rel=stylesheet><link href=https://freecx.github.io/syntax.css rel=stylesheet><body><aside class=logo><a href=https://github.com/FreeCX> <img class=gravatar src=https://freecx.github.io/avatar.png> </a><span class=logo-prompt>Я на github</span></aside><article><div class=center><h1>Используем Docker</h1><time>15 February 2016</time></div><div class=divider></div><p>Сегодня мы немного поиграем с виртуализацией на уровне операционной системы с помощью <strong>Docker</strong>.<p>Для начала немного информации с <a href=https://ru.wikipedia.org/wiki/Docker>википедии</a> для общего развития<blockquote><p><strong>Docker</strong> — программное обеспечение для автоматизации развёртывания и управления приложениями в среде виртуализации на уровне операционной системы, например LXC. Позволяет «упаковать» приложение со всем его окружением и зависимостями в контейнер, который может быть перенесён на любой Linux-системе с поддержкой cgroups в ядре, а также предоставляет среду по управлению контейнерами.<p>Разрабатывается и поддерживается одноимённой компанией-стартапом, распространяется как свободное программное обеспечение под лицензией Apache 2.0. Написан на языке Go.</blockquote><p>А теперь к делу!<h3 id=ustanovka>Установка</h3><p>Для начала проверим версию установленного ядра<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> uname</span><span style=color:#f07219> -r
+</span></code></pre><p>Версия ядра должна быть не ниже 3.10, для того чтобы можно было использовать <strong>Docker</strong>.<p>В зависимости от используемого дистрибутива установка <strong>Docker</strong> выглядит по разному. Настоятельно рекомендую обратится <a href=https://docs.docker.com/installation/#installation>к официальному гиду</a> по установке.<p>В моём случае установка под Arch Linux выполняется одной командой:<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> sudo pacman</span><span style=color:#f07219> -S</span><span style=color:#4271ae> docker
+</span></code></pre><p>Также вы можете установить <strong>Docker</strong> используя <em>sh</em> скрипт. Для загрузки скрипта потребуется <em>wget</em> или <em>curl</em>, или также можно использовать браузер.<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> wget</span><span style=color:#f07219> -qO-</span><span style=color:#4271ae> https://get.docker.com/ </span><span style=color:#3e999f>></span><span style=color:#4271ae> docker_install.sh
+</span></code></pre><p>Теперь запустим установку (не забыв про sudo/su).<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> sudo sh docker_install.sh
+</span></code></pre><p>После установки <em>желательно</em> добавить используемого пользователя в группу <em>docker</em>.<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> sudo gpasswd</span><span style=color:#f07219> -a </span><span style=color:#3e999f><</span><span style=color:#4271ae>user</span><span style=color:#3e999f>></span><span style=color:#4271ae> docker
+</span></code></pre><p>или<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> sudo usermod</span><span style=color:#f07219> -aG</span><span style=color:#4271ae> docker </span><span style=color:#3e999f><</span><span style=color:#4271ae>user</span><span style=color:#3e999f>>
+</span></code></pre><p>На этом установка закончена. Запустим демон <em>docker</em> (в моём случае через <em>systemd</em>)<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> sudo systemctl start docker
+</span></code></pre><p>и проверим работоспособность следующей командой<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> docker run hello-world
+</span></code></pre><p>Если всё хорошо, то <strong>Docker</strong> скачает и запустит данный контейнер и программа выведет следующее<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>Hello</span><span style=color:#4271ae> from </span><span style=color:#3e999f>**</span><span style=color:#4271ae>Docker</span><span style=color:#3e999f>**</span><span style=color:#4271ae>.
+</span><span style=color:#c82728>This</span><span style=color:#4271ae> message shows that your installation appears to be working correctly.
+</span><span style=color:#c82728>To</span><span style=color:#4271ae> generate this message, </span><span style=color:#3e999f>**</span><span style=color:#4271ae>Docker</span><span style=color:#3e999f>**</span><span style=color:#4271ae> took the following steps:
+</span><span> </span><span style=color:#c82728>1.</span><span style=color:#4271ae> The </span><span style=color:#3e999f>**</span><span style=color:#4271ae>Docker</span><span style=color:#3e999f>**</span><span style=color:#4271ae> client contacted the </span><span style=color:#3e999f>**</span><span style=color:#4271ae>Docker</span><span style=color:#3e999f>**</span><span style=color:#4271ae> daemon.
+</span><span> </span><span style=color:#c82728>2.</span><span style=color:#4271ae> The </span><span style=color:#3e999f>**</span><span style=color:#4271ae>Docker</span><span style=color:#3e999f>**</span><span style=color:#4271ae> daemon pulled the </span><span style=color:#839c00>"hello-world"</span><span style=color:#4271ae> image from the </span><span style=color:#3e999f>**</span><span style=color:#4271ae>Docker</span><span style=color:#3e999f>**</span><span style=color:#4271ae> Hub.
+</span><span>    (</span><span style=color:#c82728>Assuming</span><span style=color:#4271ae> it was not already locally available.</span><span>)
+</span><span> </span><span style=color:#c82728>3.</span><span style=color:#4271ae> The </span><span style=color:#3e999f>**</span><span style=color:#4271ae>Docker</span><span style=color:#3e999f>**</span><span style=color:#4271ae> daemon created a new container from that image which runs the
+</span><span>    </span><span style=color:#c82728>executable</span><span style=color:#4271ae> that produces the output you are currently reading.
+</span><span> </span><span style=color:#c82728>4.</span><span style=color:#4271ae> The </span><span style=color:#3e999f>**</span><span style=color:#4271ae>Docker</span><span style=color:#3e999f>**</span><span style=color:#4271ae> daemon streamed that output to the </span><span style=color:#3e999f>**</span><span style=color:#4271ae>Docker</span><span style=color:#3e999f>**</span><span style=color:#4271ae> client, which sent it
+</span><span>    </span><span style=color:#c82728>to</span><span style=color:#4271ae> your terminal.
+</span><span style=color:#c82728>To</span><span style=color:#4271ae> try something more ambitious, you can run an Ubuntu container with:
+</span><span> </span><span style=color:#c82728>$</span><span style=color:#4271ae> docker run</span><span style=color:#f07219> -it</span><span style=color:#4271ae> ubuntu bash
+</span><span style=color:#c82728>For</span><span style=color:#4271ae> more examples and ideas, visit:
+</span><span> </span><span style=color:#c82728>http://docs.docker.com/userguide/
+</span></code></pre><h3 id=osnovnye-komandy>Основные команды</h3><p>Весь список доступных команд можно получить использую флаг <em>--help</em><p>Рассмотрим только основные из них<ul><li>build — используется для сборки контейнера (необходим конфигурационный файл Dockerfile)<li>commit — зафиксировать изменения произведённые в контейнере<li>images — возвращает список доступных образов-контейнеров для использования<li>ps — возвращает список контейнеров и их статусы<li>pull — стянуть образ из репозитория<li>push — протолкнуть образ в репозиторий<li>restart — перезапустить контейнер<li>rm — удалить один или более контейнер<li>rmi — удалить один или более образ контейнера<li>run — запустить команду в новом контейнере<li>start — запустить контейнер<li>stop — остановить контейнер</ul><h3 id=ispol-zovanie-docker-na-primerakh>Использование <strong>Docker</strong> на примерах</h3><h4 id=zapusk-bash>Запуск bash</h4><p>Давайте сначала запустим простой контейнер с <em>bash</em> интерпретатором в нём и получим доступ к нему. Скачаем образ-контейнер <em>base/archlinux</em> для экспериментов.<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> docker pull base/archlinux
+</span></code></pre><p>При вызове команды <em>images</em> получим что-то в виде:<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> docker images
+</span><span style=color:#c82728>REPOSITORY</span><span style=color:#4271ae>          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
+</span><span style=color:#c82728>base/archlinux</span><span style=color:#4271ae>      latest              dce0559daa1b        10 months ago       282.9 MB
+</span></code></pre><p>Теперь у нас есть образ для создания контейнеров. Можно перейти непосредственно к запуску <em>bash</em> внутри контейнера. Делается это следующей командой<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> docker run</span><span style=color:#f07219> -it --entrypoint</span><span style=color:#4271ae> /bin/bash base/archlinux
+</span></code></pre><p>Используемые флаги<ul><li>-i — включение интерактивного режима (для работы с STDIN)<li>-t — подключение псевдо-TTY (связь терминала контейнера с нашим терминалом)<li>--entrypoint — переопределяет точку входа для контейнера (в нашем случае <em>bash</em>)</ul><p>В случае успеха <strong>Docker</strong> перенаправит нас на созданный tty внутри контейнера<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>[root@f64a7c5309f9</span><span style=color:#4271ae> /] </span><span style=color:#8e908c>#
+</span></code></pre><p>Здесь можно выполнять любые действия, а после зафиксировать изменения в контейнере. Но на текущий момент просто ограничимся запуском.<p>Для получения информации по запущенным контейнерам используйте флаг <em>ps</em>.<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> docker ps</span><span style=color:#f07219> -a
+</span><span style=color:#c82728>CONTAINER</span><span style=color:#4271ae> ID        IMAGE                      COMMAND                CREATED             STATUS                   PORTS               NAMES
+</span><span style=color:#c82728>f64a7c5309f9</span><span style=color:#4271ae>        base/archlinux:latest      </span><span style=color:#839c00>"/bin/bash"</span><span style=color:#4271ae>            2 minutes ago       Up 2 minutes                                 sleepy_bell
+</span></code></pre><p>По умолчанию <strong>Docker</strong> сам выдаёт названиям созданным контейнерам. В нашем случае — <em>sleepy_bell</em>, но их также можно задавать вручную используя флаг <em>--name</em>. Для выхода из контейнера используйте команду <em>exit</em>.<h4 id=zapusk-saita>Запуск сайта</h4><p>Рассмотрим более интересный случай, когда нужно собрать свой контейнер и подключить каталог к нему. Будем рассматривать развёртывание простого <em>flask</em> приложения на <em>python</em>. Все действия будем производить в текущем каталоге.<p>Содержимое файла <em>app/main.py</em><pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>from </span><span>flask </span><span style=color:#8959a8>import </span><span>Flask
+</span><span>app </span><span style=color:#3e999f>= </span><span style=color:#c82728>Flask</span><span style=color:#4271ae>(__name__)
+</span><span>
+</span><span>@app.</span><span style=color:#c82728>route</span><span>(</span><span style=color:#839c00>"/"</span><span>)
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>hello</span><span>():
+</span><span>    </span><span style=color:#8959a8>return </span><span style=color:#839c00>"Hello World!"
+</span><span>
+</span><span style=color:#8959a8>if </span><span>__name__ </span><span style=color:#3e999f>== </span><span style=color:#839c00>"__main__"</span><span>:
+</span><span>    </span><span style=color:#4271ae>app.</span><span style=color:#c82728>run</span><span style=color:#4271ae>(</span><span style=color:#f07219>host</span><span style=color:#3e999f>=</span><span style=color:#839c00>'0.0.0.0'</span><span style=color:#4271ae>)
+</span></code></pre><p>Для создания своего контейнера создадим файл с конфигурацией — <em>Dockerfile</em>, со следующим содержимым<pre class=language-dockerfile data-lang=dockerfile style=color:#111;background-color:#f9f9f9><code class=language-dockerfile data-lang=dockerfile><span style=color:#8959a8>FROM</span><span> base/archlinux
+</span><span style=color:#8959a8>MAINTAINER </span><span>dr.FreeCX &LTemail>
+</span><span style=color:#8959a8>RUN </span><span>pacman -Sy && pacman -S python-flask python-pip --noconfirm
+</span><span style=color:#8959a8>WORKDIR </span><span>/app
+</span><span style=color:#8959a8>EXPOSE </span><span>5000
+</span><span style=color:#8959a8>VOLUME </span><span>[</span><span style=color:#839c00>"/app"</span><span>]
+</span><span style=color:#3e999f>CMD </span><span>[</span><span style=color:#839c00>"python"</span><span>, </span><span style=color:#839c00>"/app/main.py"</span><span>]
+</span></code></pre><p>Рассмотрим файл построчно<ul><li><em>FROM base/archlinux</em> — указывает на каком образе основывать новый образ-контейнер<li><em>MAINTAINER dr.FreeCX &LTemail></em> — указывает автора или сопровождающего этого контейнера<li><em>RUN pacman -Sy && pacman -S python-flask python-pip --noconfirm</em> — запускает в контейнере обновление и установку пакетов<li><em>WORKDIR /app</em> — указывает на рабочую директорию данного контейнера<li><em>EXPOSE 5000</em> — устанавливаем открываемый порт<li><em>VOLUME ["/app"]</em> — указывает на подключаемый пользовательский том<li><em>CMD ["python", "/app/main.py"]</em> — отвечает за запуск команды в контейнере (её можно переопределить используя флаг <em>--entrypoint</em> при запуске контейнера).</ul><p>На третьем шаге команды объединены в одну для того чтобы не создавать лишние коммиты в создаваемом контейнере.<p>Теперь необходимо собрать данный контейнер, для этого используем команду <em>build</em><pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> docker build</span><span style=color:#f07219> -t</span><span style=color:#4271ae> site-app .
+</span></code></pre><p>Флаг <em>-t</em> отвечает за имя контейнера-образа (ну или tag) и точка в конце команды указывает на поиск файла <em>Dockerfile</em> в текущей директории.<p>Если всё прошло удачно, то увидим следующее<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>Sending</span><span style=color:#4271ae> build context to Docker daemon 43.01 kB
+</span><span style=color:#c82728>Sending</span><span style=color:#4271ae> build context to Docker daemon
+</span><span style=color:#c82728>Step</span><span style=color:#4271ae> 0 : FROM base/archlinux
+</span><span> </span><span style=color:#c82728>---</span><span style=color:#3e999f>></span><span style=color:#4271ae> dce0559daa1b
+</span><span style=color:#c82728>Step</span><span style=color:#4271ae> 1 : MAINTAINER dr.FreeCX </span><span style=color:#3e999f><</span><span style=color:#4271ae>email</span><span style=color:#3e999f>>
+</span><span> </span><span style=color:#c82728>---</span><span style=color:#3e999f>></span><span style=color:#4271ae> Using cache
+</span><span> </span><span style=color:#c82728>---</span><span style=color:#3e999f>> </span><span style=color:#f07219>64</span><span style=color:#4271ae>e04e1e920f
+</span><span style=color:#c82728>Step</span><span style=color:#4271ae> 2 : RUN pacman</span><span style=color:#f07219> -Sy </span><span style=color:#3e999f>&& </span><span style=color:#c82728>pacman</span><span style=color:#f07219> -S</span><span style=color:#4271ae> python-flask python-pip</span><span style=color:#f07219> --noconfirm
+</span><span> </span><span style=color:#c82728>---</span><span style=color:#3e999f>></span><span style=color:#4271ae> Using cache
+</span><span> </span><span style=color:#c82728>---</span><span style=color:#3e999f>></span><span style=color:#4271ae> daa2e8f99de7
+</span><span style=color:#c82728>Step</span><span style=color:#4271ae> 3 : WORKDIR /app
+</span><span> </span><span style=color:#c82728>---</span><span style=color:#3e999f>></span><span style=color:#4271ae> Running in 85dd63b293ee
+</span><span> </span><span style=color:#c82728>---</span><span style=color:#3e999f>> </span><span style=color:#f07219>578</span><span style=color:#4271ae>e66682a73
+</span><span style=color:#c82728>Removing</span><span style=color:#4271ae> intermediate container 85dd63b293ee
+</span><span style=color:#c82728>Step</span><span style=color:#4271ae> 4 : EXPOSE 5000
+</span><span> </span><span style=color:#c82728>---</span><span style=color:#3e999f>></span><span style=color:#4271ae> Running in 125baa973662
+</span><span> </span><span style=color:#c82728>---</span><span style=color:#3e999f>> </span><span style=color:#f07219>12</span><span style=color:#4271ae>a28947863a
+</span><span style=color:#c82728>Removing</span><span style=color:#4271ae> intermediate container 125baa973662
+</span><span style=color:#c82728>Step</span><span style=color:#4271ae> 5 : VOLUME /app
+</span><span> </span><span style=color:#c82728>---</span><span style=color:#3e999f>></span><span style=color:#4271ae> Running in c54bedebe79f
+</span><span> </span><span style=color:#c82728>---</span><span style=color:#3e999f>></span><span style=color:#4271ae> c4807322f855
+</span><span style=color:#c82728>Removing</span><span style=color:#4271ae> intermediate container c54bedebe79f
+</span><span style=color:#c82728>Step</span><span style=color:#4271ae> 6 : CMD python /app/main.py
+</span><span> </span><span style=color:#c82728>---</span><span style=color:#3e999f>></span><span style=color:#4271ae> Running in fd472c20b3b3
+</span><span> </span><span style=color:#c82728>---</span><span style=color:#3e999f>> </span><span style=color:#f07219>8163426</span><span style=color:#4271ae>a880f
+</span><span style=color:#c82728>Removing</span><span style=color:#4271ae> intermediate container fd472c20b3b3
+</span><span style=color:#c82728>Successfully</span><span style=color:#4271ae> built 8163426a880f
+</span></code></pre><p>Выполнив команду <em>images</em> убедимся, что появился новый образ<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> docker images
+</span><span style=color:#c82728>REPOSITORY</span><span style=color:#4271ae>          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
+</span><span style=color:#c82728>site-app</span><span style=color:#4271ae>            latest              8163426a880f        3 minutes ago       411.5 MB
+</span></code></pre><p>Теперь осталось самое интересное — запуск нашего контейнера. Давайте же сделаем это<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> docker run</span><span style=color:#f07219> -it -d -p</span><span style=color:#4271ae> 8080:5000</span><span style=color:#f07219> -v </span><span style=color:#839c00>"$</span><span style=color:#c82728>PWD</span><span style=color:#839c00>/app"</span><span style=color:#4271ae>:/app site-app
+</span><span style=color:#c82728>$</span><span style=color:#4271ae> docker ps</span><span style=color:#f07219> -a
+</span><span style=color:#c82728>CONTAINER</span><span style=color:#4271ae> ID        IMAGE                      COMMAND                CREATED             STATUS                      PORTS                    NAMES
+</span><span style=color:#c82728>1d3b134e4095</span><span style=color:#4271ae>        site-app:latest            </span><span style=color:#839c00>"python /app/main.py   4 seconds ago       Up 2 seconds                0.0.0.0:8080->5000/tcp   focused_swartz
+</span></code></pre><p>Используемые флаги<ul><li>-d — запустить контейнер в фоне<li>-p — привязывает порт (на текущей машине 8080 к порту в контейнере 5000)<li>-v — подключает пользовательский том ("$PWD/app" на машине к "/app" в контейнере)</ul><p>Как результат по адресу 0.0.0.0:8080 становится доступно <em>flask</em>-приложение.<p>Для остановки контейнера воспользуемся командой <em>stop</em> указав в качестве параметра имя либо <em>container id</em><pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> docker stop 1d3b134e4095
+</span><span style=color:#c82728>$</span><span style=color:#4271ae> docker stop focused_swartz
+</span></code></pre><h3 id=para-slov-o-docker-compose>Пара слов о Docker compose</h3><blockquote><p>Данный раздел находится в слишком пассивном написании!</blockquote><p>Теперь когда мы немного разобрались с docker'ом, давайте рассмотрим более интересную штуку, такую как <em>Docker Сompose</em>!<p>Как говорит официальная документация<blockquote><p>Compose is a tool for defining and running multi-container Docker applications.</blockquote><p>то есть это тулза с помощью которой можно собрать систему из нескольких связанных docker-контейнеров, что мы и сделаем!<h4 id=chto-budem-vaiat>Что будем ваять?</h4><p>Давайте напишем web-приложение доску, где можно будет оставить комментарий.<p>Для этого нам понадобится несколько компонентов:<ul><li>flask — наш микрофреймворк<li>postgresql — наша БД<li>nginx — http-сервер</ul><p>Конечно можно обойтись без nginx, но почему бы и нет?!<p>Структура нашего проекта будет следующей:<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#4271ae>.
+</span><span style=color:#c82728>├──</span><span style=color:#4271ae> docker-compose.yml
+</span><span style=color:#c82728>├──</span><span style=color:#4271ae> .env
+</span><span style=color:#c82728>├──</span><span style=color:#4271ae> nginx
+</span><span style=color:#c82728>│</span><span style=color:#4271ae>   ├── Dockerfile
+</span><span style=color:#c82728>│</span><span style=color:#4271ae>   └── sites-enabled
+</span><span style=color:#c82728>│</span><span style=color:#4271ae>       └── flask_project
+</span><span style=color:#c82728>└──</span><span style=color:#4271ae> web
+</span><span>    </span><span style=color:#c82728>├──</span><span style=color:#4271ae> config.py
+</span><span>    </span><span style=color:#c82728>├──</span><span style=color:#4271ae> create_db.py
+</span><span>    </span><span style=color:#c82728>├──</span><span style=color:#4271ae> Dockerfile
+</span><span>    </span><span style=color:#c82728>├──</span><span style=color:#4271ae> main.py
+</span><span>    </span><span style=color:#c82728>├──</span><span style=color:#4271ae> requirements.txt
+</span><span>    </span><span style=color:#c82728>└──</span><span style=color:#4271ae> templates
+</span><span>        </span><span style=color:#c82728>└──</span><span style=color:#4271ae> index.html
+</span></code></pre><p>Но начнём по порядку!<h4 id=prilozhenie>Приложение</h4><p>Приложение будет реализовывать две функции:<ul><li>добавление данных в БД<li>и отображение</ul><p><code>main.py</code><pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>from </span><span>flask </span><span style=color:#8959a8>import </span><span>Flask, render_template, redirect, request
+</span><span style=color:#8959a8>from </span><span>werkzeug.contrib.fixers </span><span style=color:#8959a8>import </span><span>ProxyFix
+</span><span style=color:#8959a8>from </span><span>flask_sqlalchemy </span><span style=color:#8959a8>import </span><span>SQLAlchemy
+</span><span>
+</span><span>app </span><span style=color:#3e999f>= </span><span style=color:#c82728>Flask</span><span style=color:#4271ae>(__name__)
+</span><span style=color:#8e908c># загрузим конфиг из файла
+</span><span style=color:#4271ae>app.config.</span><span style=color:#c82728>from_object</span><span style=color:#4271ae>(</span><span style=color:#839c00>'config'</span><span style=color:#4271ae>)
+</span><span>
+</span><span style=color:#8e908c># нужно для корректной работы проброса через gunicorn и nginx
+</span><span>app.wsgi_app </span><span style=color:#3e999f>= </span><span style=color:#c82728>ProxyFix</span><span style=color:#4271ae>(app.wsgi_app)
+</span><span>
+</span><span style=color:#8e908c># создаём объект БД
+</span><span>db </span><span style=color:#3e999f>= </span><span style=color:#c82728>SQLAlchemy</span><span style=color:#4271ae>(app)
+</span><span>
+</span><span>
+</span><span style=color:#8e908c># наша таблица в БД
+</span><span style=color:#8e908c># где у нас будет два поля с информацией
+</span><span style=color:#8959a8>class </span><span style=color:#c99e00>Post</span><span>(</span><span style=color:#839c00>db.Model</span><span>):
+</span><span>    </span><span style=color:#4271ae>id </span><span style=color:#3e999f>= </span><span style=color:#4271ae>db.</span><span style=color:#c82728>Column</span><span style=color:#4271ae>(db.Integer, </span><span style=color:#f07219>primary_key</span><span style=color:#3e999f>=</span><span style=color:#f07219>True</span><span style=color:#4271ae>)
+</span><span>    </span><span style=color:#8e908c># пользователь
+</span><span>    user </span><span style=color:#3e999f>= </span><span style=color:#4271ae>db.</span><span style=color:#c82728>Column</span><span style=color:#4271ae>(db.</span><span style=color:#c82728>String</span><span style=color:#4271ae>(</span><span style=color:#f07219>16</span><span style=color:#4271ae>), </span><span style=color:#f07219>nullable</span><span style=color:#3e999f>=</span><span style=color:#f07219>False</span><span style=color:#4271ae>)
+</span><span>    </span><span style=color:#8e908c># его текстовой пост
+</span><span>    text </span><span style=color:#3e999f>= </span><span style=color:#4271ae>db.</span><span style=color:#c82728>Column</span><span style=color:#4271ae>(db.</span><span style=color:#c82728>String</span><span style=color:#4271ae>(</span><span style=color:#f07219>256</span><span style=color:#4271ae>))
+</span><span>
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>__init__</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>user</span><span>, </span><span style=color:#f07219>text</span><span style=color:#3e999f>=</span><span style=color:#839c00>'&LTempty post>'</span><span>):
+</span><span>        </span><span style=color:#c82728>self</span><span>.user </span><span style=color:#3e999f>= </span><span>user
+</span><span>        </span><span style=color:#c82728>self</span><span>.text </span><span style=color:#3e999f>= </span><span>text
+</span><span>
+</span><span>
+</span><span>@app.</span><span style=color:#c82728>route</span><span>(</span><span style=color:#839c00>'/'</span><span>, </span><span style=color:#f07219>methods</span><span style=color:#3e999f>=</span><span>[</span><span style=color:#839c00>'GET'</span><span>, </span><span style=color:#839c00>'POST'</span><span>])
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>index</span><span>():
+</span><span>    </span><span style=color:#8959a8>if </span><span>request.method </span><span style=color:#3e999f>== </span><span style=color:#839c00>'GET'</span><span>:
+</span><span>        </span><span style=color:#8e908c># получаем все посты
+</span><span>        posts </span><span style=color:#3e999f>= </span><span style=color:#4271ae>Post.query.</span><span style=color:#c82728>all</span><span style=color:#4271ae>()
+</span><span>        </span><span style=color:#8e908c># рендерим страницу с этими данными
+</span><span>        </span><span style=color:#8959a8>return </span><span style=color:#c82728>render_template</span><span style=color:#4271ae>(</span><span style=color:#839c00>'index.html'</span><span style=color:#4271ae>, </span><span style=color:#f07219>posts</span><span style=color:#3e999f>=</span><span style=color:#4271ae>posts)
+</span><span>    </span><span style=color:#8959a8>elif </span><span>request.method </span><span style=color:#3e999f>== </span><span style=color:#839c00>'POST'</span><span>:
+</span><span>        </span><span style=color:#8e908c># получаем данные со страницы
+</span><span>        user, text </span><span style=color:#3e999f>= </span><span>request.form[</span><span style=color:#839c00>'user-name'</span><span>], request.form[</span><span style=color:#839c00>'user-text'</span><span>]
+</span><span>        </span><span style=color:#8e908c># создаём пост
+</span><span>        new_post </span><span style=color:#3e999f>= </span><span style=color:#c82728>Post</span><span style=color:#4271ae>(user, text)
+</span><span>        </span><span style=color:#8e908c># добавляем в БД
+</span><span>        </span><span style=color:#4271ae>db.session.</span><span style=color:#c82728>add</span><span style=color:#4271ae>(new_post)
+</span><span>        </span><span style=color:#4271ae>db.session.</span><span style=color:#c82728>commit</span><span style=color:#4271ae>()
+</span><span>        </span><span style=color:#8e908c># редиректим на страницу с GET
+</span><span>        </span><span style=color:#8959a8>return </span><span style=color:#c82728>redirect</span><span style=color:#4271ae>(</span><span style=color:#839c00>'/'</span><span style=color:#4271ae>)
+</span><span>    </span><span style=color:#8959a8>else</span><span>:
+</span><span>        </span><span style=color:#8e908c># не будем поддерживать остальные методы
+</span><span>        </span><span style=color:#8959a8>return </span><span style=color:#839c00>'Noooooooo!'</span><span>, </span><span style=color:#f07219>402
+</span><span>
+</span><span>
+</span><span style=color:#8959a8>if </span><span>__name__ </span><span style=color:#3e999f>== </span><span style=color:#839c00>'__main__'</span><span>:
+</span><span>    </span><span style=color:#4271ae>app.</span><span style=color:#c82728>run</span><span style=color:#4271ae>()
+</span></code></pre><p><code>config.py</code><pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>from </span><span>os </span><span style=color:#8959a8>import </span><span>environ
+</span><span>
+</span><span style=color:#c82728>SECRET_KEY </span><span style=color:#3e999f>= </span><span>environ[</span><span style=color:#839c00>'SECRET_KEY'</span><span>]
+</span><span style=color:#c82728>DEBUG </span><span style=color:#3e999f>= </span><span>environ[</span><span style=color:#839c00>'DEBUG'</span><span>]
+</span><span style=color:#c82728>DB_NAME </span><span style=color:#3e999f>= </span><span>environ[</span><span style=color:#839c00>'DB_NAME'</span><span>]
+</span><span style=color:#c82728>DB_USER </span><span style=color:#3e999f>= </span><span>environ[</span><span style=color:#839c00>'DB_USER'</span><span>]
+</span><span style=color:#c82728>DB_PASS </span><span style=color:#3e999f>= </span><span>environ[</span><span style=color:#839c00>'DB_PASS'</span><span>]
+</span><span style=color:#c82728>DB_SERVICE </span><span style=color:#3e999f>= </span><span>environ[</span><span style=color:#839c00>'DB_SERVICE'</span><span>]
+</span><span style=color:#c82728>DB_PORT </span><span style=color:#3e999f>= </span><span>environ[</span><span style=color:#839c00>'DB_PORT'</span><span>]
+</span><span style=color:#c82728>SQLALCHEMY_DATABASE_URI </span><span style=color:#3e999f>= </span><span style=color:#839c00>'postgresql://</span><span>{0}</span><span style=color:#839c00>:</span><span>{1}</span><span style=color:#839c00>@</span><span>{2}</span><span style=color:#839c00>:</span><span>{3}</span><span style=color:#839c00>/</span><span>{4}</span><span style=color:#839c00>'</span><span style=color:#4271ae>.</span><span style=color:#c82728>format</span><span style=color:#4271ae>(
+</span><span style=color:#4271ae>    </span><span style=color:#c82728>DB_USER</span><span style=color:#4271ae>, </span><span style=color:#c82728>DB_PASS</span><span style=color:#4271ae>, </span><span style=color:#c82728>DB_SERVICE</span><span style=color:#4271ae>, </span><span style=color:#c82728>DB_PORT</span><span style=color:#4271ae>, </span><span style=color:#c82728>DB_NAME
+</span><span style=color:#4271ae>)
+</span></code></pre><p><code>create_db.py</code><pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>from </span><span>main </span><span style=color:#8959a8>import </span><span>db
+</span><span>
+</span><span>
+</span><span style=color:#4271ae>db.</span><span style=color:#c82728>create_all</span><span style=color:#4271ae>()
+</span><span style=color:#4271ae>db.session.</span><span style=color:#c82728>commit</span><span style=color:#4271ae>()
+</span></code></pre><p><code>index.html</code><pre class=language-html data-lang=html style=color:#111;background-color:#f9f9f9><code class=language-html data-lang=html><span>&LT!doctype html>
+</span><span style=color:#5d9be5><</span><span style=color:#c82728>title</span><span style=color:#5d9be5>></span><span>simply dashboard</span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>title</span><span style=color:#5d9be5>>
+</span><span style=color:#5d9be5><</span><span style=color:#c82728>p</span><span style=color:#5d9be5>></span><span>send a post</span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>p</span><span style=color:#5d9be5>>
+</span><span style=color:#5d9be5><</span><span style=color:#c82728>form name=</span><span style=color:#839c00>'add-user' </span><span style=color:#c82728>method=</span><span style=color:#839c00>'POST' </span><span style=color:#c82728>action=</span><span style=color:#839c00>'/'</span><span style=color:#5d9be5>>
+</span><span>  </span><span style=color:#5d9be5><</span><span style=color:#c82728>div class</span><span style=color:#5d9ae5>=</span><span style=color:#839c00>'user-name-input'</span><span style=color:#5d9be5>>
+</span><span>    user: </span><span style=color:#5d9be5><</span><span style=color:#c82728>input name=</span><span style=color:#839c00>'user-name' </span><span style=color:#c82728>class=</span><span style=color:#839c00>'user-name' </span><span style=color:#c82728>type=</span><span style=color:#839c00>'text' </span><span style=color:#c82728>size=</span><span style=color:#839c00>16</span><span style=color:#5d9be5>>
+</span><span>    </span><span style=color:#5d9be5><</span><span style=color:#c82728>input type=</span><span style=color:#839c00>'submit' </span><span style=color:#c82728>value=</span><span style=color:#839c00>'send post'</span><span style=color:#5d9be5>>
+</span><span>  </span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>div</span><span style=color:#5d9be5>>
+</span><span>  </span><span style=color:#5d9be5><</span><span style=color:#c82728>div class</span><span style=color:#5d9ae5>=</span><span style=color:#839c00>'user-text-input'</span><span style=color:#5d9be5>>
+</span><span>    text:</span><span style=color:#5d9be5><</span><span style=color:#c82728>br</span><span style=color:#5d9be5>><</span><span style=color:#c82728>textarea name=</span><span style=color:#839c00>'user-text' </span><span style=color:#c82728>style=</span><span style=color:#839c00>'width</span><span style=color:#c82728>: </span><span style=color:#f07219>300px</span><span style=color:#c82728>; </span><span style=color:#839c00>height</span><span style=color:#c82728>: </span><span style=color:#f07219>100px</span><span style=color:#c82728>;</span><span style=color:#839c00>'</span><span style=color:#5d9be5>>&LT/</span><span style=color:#c82728>textarea</span><span style=color:#5d9be5>>
+</span><span>  </span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>div</span><span style=color:#5d9be5>>
+</span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>form</span><span style=color:#5d9be5>>
+</span><span style=color:#5d9be5><</span><span style=color:#c82728>hr</span><span style=color:#5d9be5>><</span><span style=color:#c82728>p</span><span style=color:#5d9be5>></span><span>Posts</span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>p</span><span style=color:#5d9be5>>
+</span><span style=color:#5d9be5><</span><span style=color:#c82728>ul</span><span style=color:#5d9be5>>
+</span><span>  {% for post in posts %}
+</span><span>    </span><span style=color:#5d9be5><</span><span style=color:#c82728>li</span><span style=color:#5d9be5>>
+</span><span>      </span><span style=color:#5d9be5><</span><span style=color:#c82728>div class</span><span style=color:#5d9ae5>=</span><span style=color:#839c00>'user' </span><span style=color:#c82728>style</span><span style=color:#5d9ae5>=</span><span style=color:#839c00>'font-weight</span><span style=color:#5d9ae5>: </span><span style=color:#3e999f>bold</span><span style=color:#5d9ae5>;</span><span style=color:#839c00>'</span><span style=color:#5d9be5>></span><span>{{ post.user }}</span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>div</span><span style=color:#5d9be5>>
+</span><span>      </span><span style=color:#5d9be5><</span><span style=color:#c82728>div class</span><span style=color:#5d9ae5>=</span><span style=color:#839c00>'post'</span><span style=color:#5d9be5>></span><span>{{ post.text }}</span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>div</span><span style=color:#5d9be5>>
+</span><span>    </span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>li</span><span style=color:#5d9be5>>
+</span><span>  {% endfor %}
+</span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>ul</span><span style=color:#5d9be5>>
+</span></code></pre><p><code>requirements.txt</code><pre style=color:#111;background-color:#f9f9f9><code><span>flask==0.11.1
+</span><span>flask_sqlalchemy==2.1
+</span><span>gunicorn==19.6.0
+</span><span>psycopg2==2.6.2
+</span></code></pre><p><code>Dockerfile</code><pre class=language-dockerfile data-lang=dockerfile style=color:#111;background-color:#f9f9f9><code class=language-dockerfile data-lang=dockerfile><span style=color:#8959a8>FROM</span><span> python:3.4-onbuild
+</span></code></pre><h4 id=nginx>nginx</h4><p><code>Dockerfile</code><pre class=language-dockerfile data-lang=dockerfile style=color:#111;background-color:#f9f9f9><code class=language-dockerfile data-lang=dockerfile><span style=color:#8959a8>FROM</span><span> tutum/nginx
+</span><span style=color:#8959a8>RUN </span><span>rm /etc/nginx/sites-enabled/default
+</span><span style=color:#8959a8>ADD </span><span>sites-enabled/ /etc/nginx/sites-enabled
+</span></code></pre><p><code>flask_project</code><pre style=color:#111;background-color:#f9f9f9><code><span>server {
+</span><span>    listen 5000;
+</span><span>    charset utf-8;
+</span><span>
+</span><span>    access_log  /var/log/nginx/access.log;
+</span><span>    error_log  /var/log/nginx/error.log;
+</span><span>
+</span><span>    client_max_body_size 32m;
+</span><span>
+</span><span>    location / {
+</span><span>        proxy_set_header X-Forward-For $proxy_add_x_forwarded_for;
+</span><span>        proxy_set_header Host $http_host;
+</span><span>        proxy_redirect off;
+</span><span>        if (!-f $request_filename) {
+</span><span>            proxy_pass http://web:8000;
+</span><span>            break;
+</span><span>        }
+</span><span>    }
+</span><span>}
+</span></code></pre><h4 id=konfigi-docker-compose>Конфиги Docker Compose</h4><p><code>.env</code><pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>DEBUG</span><span style=color:#3e999f>=</span><span style=color:#839c00>True
+</span><span style=color:#c82728>SECRET_KEY</span><span style=color:#3e999f>=</span><span style=color:#839c00>its-my-super-secret-key-please-dont-forget-it
+</span><span style=color:#c82728>DB_NAME</span><span style=color:#3e999f>=</span><span style=color:#839c00>postgres
+</span><span style=color:#c82728>DB_USER</span><span style=color:#3e999f>=</span><span style=color:#839c00>postgres
+</span><span style=color:#c82728>DB_PASS</span><span style=color:#3e999f>=</span><span style=color:#839c00>postgres
+</span><span style=color:#c82728>DB_SERVICE</span><span style=color:#3e999f>=</span><span style=color:#839c00>postgres
+</span><span style=color:#c82728>DB_PORT</span><span style=color:#3e999f>=</span><span style=color:#839c00>5432
+</span></code></pre><p><code>docker-compose.yml</code><pre class=language-yaml data-lang=yaml style=color:#111;background-color:#f9f9f9><code class=language-yaml data-lang=yaml><span style=color:#c82728>web</span><span>:
+</span><span>  </span><span style=color:#c82728>restart</span><span>: </span><span style=color:#839c00>always
+</span><span>  </span><span style=color:#c82728>build</span><span>: </span><span style=color:#839c00>./web
+</span><span>  </span><span style=color:#c82728>expose</span><span>:
+</span><span>    - </span><span style=color:#839c00>"8000"
+</span><span>  </span><span style=color:#c82728>links</span><span>:
+</span><span>    - </span><span style=color:#839c00>postgres:postgres
+</span><span>  </span><span style=color:#c82728>env_file</span><span>: </span><span style=color:#839c00>.env
+</span><span>  </span><span style=color:#c82728>command</span><span>: </span><span style=color:#839c00>/usr/local/bin/gunicorn -w 2 -b :8000 main:app </span><span style=color:#8e908c># --log-file /tmp/gunicorn.log
+</span><span>
+</span><span style=color:#c82728>nginx</span><span>:
+</span><span>  </span><span style=color:#c82728>restart</span><span>: </span><span style=color:#839c00>always
+</span><span>  </span><span style=color:#c82728>build</span><span>: </span><span style=color:#839c00>./nginx/
+</span><span>  </span><span style=color:#c82728>ports</span><span>:
+</span><span>    - </span><span style=color:#839c00>"5000:5000"
+</span><span>  </span><span style=color:#c82728>volumes</span><span>:
+</span><span>    - </span><span style=color:#839c00>/www/static
+</span><span>  </span><span style=color:#c82728>volumes_from</span><span>:
+</span><span>    - </span><span style=color:#839c00>web
+</span><span>  </span><span style=color:#c82728>links</span><span>:
+</span><span>    - </span><span style=color:#839c00>web:web
+</span><span>
+</span><span style=color:#c82728>data</span><span>:
+</span><span>  </span><span style=color:#c82728>restart</span><span>: </span><span style=color:#839c00>always
+</span><span>  </span><span style=color:#c82728>image</span><span>: </span><span style=color:#839c00>postgres:latest
+</span><span>  </span><span style=color:#c82728>volumes</span><span>:
+</span><span>    - </span><span style=color:#839c00>/var/lib/postgresql
+</span><span>  </span><span style=color:#c82728>command</span><span>: </span><span style=color:#839c00>"true"
+</span><span>
+</span><span style=color:#c82728>postgres</span><span>:
+</span><span>  </span><span style=color:#c82728>restart</span><span>: </span><span style=color:#839c00>always
+</span><span>  </span><span style=color:#c82728>image</span><span>: </span><span style=color:#839c00>postgres:latest
+</span><span>  </span><span style=color:#c82728>volumes_from</span><span>:
+</span><span>    - </span><span style=color:#839c00>data
+</span><span>  </span><span style=color:#c82728>ports</span><span>:
+</span><span>    - </span><span style=color:#839c00>"5432:5432"
+</span></code></pre><h4 id=final>Финал</h4><p>Собираем наши контейнеры<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> docker-compose build
+</span></code></pre><p>Cоздаём таблицу в БД<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> docker-compose run web /usr/local/bin/python create_demo.py
+</span></code></pre><p>И наконец поднимаем их<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> docker-compose up</span><span style=color:#f07219> -d
+</span></code></pre><p>Теперь можно открыть сам веб-сервис в браузере <a href=http://localhost:5000>http://localhost:5000</a>.<p>Для остановки работы контейнеров выполните следующую команду в директории с проектом<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> docker-compose stop
+</span></code></pre><p>Исходный код всего проекта доступен в <a href=https://github.com/FreeCX/docker-compose-demo>репозитории</a>.<p>Вот и всё на сегодня.<h2 id=poleznye-ssylki>Полезные ссылки</h2><p>[1] <a href=https://www.docker.com/>Docker</a> -- официальный сайт.<p>[2] <a href=https://registry.hub.docker.com/>Docker Hub</a> -- хранилище <strong>Docker</strong> контейнеров.<p>[3] <a href=https://docs.docker.com/compose/>Docker Compose</a> -- работа с мультиконтейнерами.<p>[4] <a href=http://flask.pocoo.org/>Flask</a> -- микрофреймворком для создания вебсайтов на языке Python.<p>[5] <a href=https://www.postgresql.org>PostgreSQL</a> -- свободная объектно-реляционная система управления базами данных.</article><div class=back><a href=https://freecx.github.io/>Назад</a></div><div class=footer><span>Также читайте <a title="ты сам сломал ссылку, так что ничего личного" href=https://antoniii.github.io/> <s>antoniii</s> </a> <a href=https://citrux.github.io/>citrux</a> <a href=https://sputnikas.github.io/>sputnikas</a> </span></div><script>let msg=` А спонсор статей в моём блоге -- моя лень -- спонсор статей.`;[`=`.repeat(msg.length+ 1),msg,`=`.repeat(msg.length+ 1)].forEach(a=>console.warn(a))</script>
