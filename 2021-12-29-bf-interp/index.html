@@ -1,0 +1,214 @@
+<!doctype html><html lang=ru><head><meta charset=utf-8><meta content="IE=edge" http-equiv=X-UA-Compatible><meta content="width=device-width,initial-scale=1" name=viewport><title>Интепретатор Brainfuck</title><meta content="Кодерный понедельник" name=description><meta content=https://freecx.github.io/touch-icon.png property=og:image><link href=https://code.cdn.mozilla.net/fonts/fira.css rel=stylesheet><link href=https://freecx.github.io/favicon.png rel=icon><link href=https://freecx.github.io/touch-icon.png rel=apple-touch-icon><link href=https://freecx.github.io/main.css rel=stylesheet><link href=https://freecx.github.io/syntax.css rel=stylesheet><body><aside class=logo><a href=https://github.com/FreeCX> <img class=gravatar src=https://freecx.github.io/avatar.png> </a><span class=logo-prompt>Я на github</span></aside><article><div class=center><h1>Интепретатор Brainfuck</h1><time>29 December 2021</time></div><div class=divider></div><p>Всем привет!<p>Я планировал написать одну большую статью про изотерический язык программирования Brainfuck, но как всегда что-то пошло не так и я не успел дописать код. Так что я решил разбить статью на две и первую выпустить под конец 2021.<p>Давайте же начнём!<h1 id=vvedenie>Введение</h1><p>Прежде чем начать нам нужно немного узнать о языке Brainfuck. Информации из <a href=https://ru.wikipedia.org/wiki/Brainfuck>вики</a> достаточно для понимания:<blockquote><p>Brainfuck — один из известнейших эзотерических языков программирования, придуман Урбаном Мюллером (нем. Urban Müller) в 1993 году, известен своим минимализмом. Название языка можно перевести на русский как вынос мозга, оно напрямую образовано от английского выражения brainfuck (brain — мозг, fuck — иметь половое сношение (оск.)), т. е. заниматься ерундой. Язык имеет восемь команд, каждая из которых записывается одним символом. Исходный код программы на Brainfuck представляет собой последовательность этих символов без какого-либо дополнительного синтаксиса.</blockquote><p>У нас в распоряжении есть 8 команд (<a href=https://github.com/ryanfox/brainfunction>brainfuck с функциями</a> не будем рассматривать), а именно:<ul><li><code>></code> — перейти к следующей ячейке памяти<li><code><</code> — перейти к предыдущей ячейке памяти<li><code>+</code> — увеличить значение текущей ячейки на единицу<li><code>-</code> — уменьшить значение текущей ячейки на единицу<li><code>.</code> — напечатать значение из текущей ячейки<li><code>,</code> — ввести значение (stdin) и положить в текущую ячейку<li><code>[</code> — перейти к коду после <code>]</code>, если в текущей ячейке ноль<li><code>]</code> — вернуться к коду после <code>]</code>, если в текущей ячейке не ноль</ul><p>Этих 8-ми команд хватит чтобы реализовать любую программу, т.к. язык <a href=https://ru.wikipedia.org/wiki/%D0%9F%D0%BE%D0%BB%D0%BD%D0%BE%D1%82%D0%B0_%D0%BF%D0%BE_%D0%A2%D1%8C%D1%8E%D1%80%D0%B8%D0%BD%D0%B3%D1%83>полный по Тьюрингу</a>, но наша задача заключается не в написании, а в интерпретации кода на brainfuck.<p>Давайте же перейдём к планированию нашего интерпретатора.<h1 id=struktura-interpretatora>Структура интерпретатора</h1><p>Не будем усложнять себе работу и реализуем самый простой интерпретатор.<p>Работа выполним в два этапа:<ul><li>парсинг (или разбор токенов) программы в удобный для нас вид<li>выполнение программы</ul><h1 id=etap-razbora-tokenov>Этап разбора токенов</h1><p>На данном этапе мы должны входной поток токенов преобразовать в некий набор идентификаторов для нашей программы. По сути это отображение одного множества на другое, но не будем усложнять статью :)<p>Считайте просто что мы символ заменяем на некоторую константу (хотя мы будем использовать перечисление).<p>Вроде всё просто, но тут есть две интересные команды, которые немного усложняют наш процесс разбора — <code>[</code> и <code>]</code>.<p>Из-за них этап разбора немного усложняется, так как нам нужно запомнить позиции этих токенов, чтобы на этапе интерпретации можно было легко реализовать переход. Чуть дальше вы поймете о чём я говорю.<p>Всё конечно не очень так сложно. Просто нам нужно сохранить индекс токена в некий буфер, когда мы достигаем команды <code>[</code>, а на команде <code>]</code> должны проставить индексы для <code>[</code> и <code>]</code> в подготовленной нами программе для интерпретатора.<h1 id=etap-vypolneniia-koda>Этап выполнения кода</h1><p>После того как этап разбора токенов закончен, то можно перейти к выполнению программы.<p>Данный этап можно разбить на три шага:<ol><li>берём токен по текущему индексу (ip — instruction pointer)<li>выполняем его<li>увеличиваем ip</ol><p>Только нужно сделать небольшое уточнение — команды <code>[</code> и <code>]</code> могут менять <strong>ip</strong>.<p>Вроде это всё что нужно знать для того чтобы сделать свой интерпретатор brainfuck.<h1 id=realizatsiia>Реализация</h1><p>Писать рабочий интерпретатор я буду на <strong>Rust</strong>, но так же приложу код на <strong>C++</strong> в конце статьи.<h2 id=bazovyi-kod>Базовый код</h2><pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8e908c>// набор команд
+</span><span>#[</span><span style=color:#c82728>derive</span><span>(Debug, Clone, Copy)]
+</span><span style=color:#8959a8>pub enum </span><span>Command {
+</span><span>    </span><span style=color:#8e908c>// >
+</span><span>    Next,
+</span><span>    </span><span style=color:#8e908c>// <
+</span><span>    Previous,
+</span><span>    </span><span style=color:#8e908c>// +
+</span><span>    Increment,
+</span><span>    </span><span style=color:#8e908c>// -
+</span><span>    Decrement,
+</span><span>    </span><span style=color:#8e908c>// .
+</span><span>    Put,
+</span><span>    </span><span style=color:#8e908c>// ,
+</span><span>    Read,
+</span><span>    </span><span style=color:#8e908c>// [
+</span><span>    LoopBegin(</span><span style=color:#8959a8>usize</span><span>),
+</span><span>    </span><span style=color:#8e908c>// ]
+</span><span>    LoopEnd(</span><span style=color:#8959a8>usize</span><span>),
+</span><span>}
+</span><span>
+</span><span style=color:#8e908c>// наш интерпретатор
+</span><span style=color:#8959a8>pub struct </span><span>Emulator {
+</span><span>    </span><span style=color:#8e908c>// вспомогательный буфер для `[` и `]`
+</span><span>    </span><span style=color:#c82728>stack</span><span>: </span><span style=color:#c99e00>Vec</span><span><</span><span style=color:#8959a8>usize</span><span>>,
+</span><span>    </span><span style=color:#8e908c>// спарсенная программа
+</span><span>    </span><span style=color:#c82728>app</span><span>: </span><span style=color:#c99e00>Vec</span><span>&LTCommand>,
+</span><span>    </span><span style=color:#8e908c>// ячейки с памятью программы
+</span><span>    </span><span style=color:#c82728>mem</span><span>: </span><span style=color:#c99e00>Vec</span><span><</span><span style=color:#8959a8>u8</span><span>>,
+</span><span>    </span><span style=color:#8e908c>// указатель на инструкцию
+</span><span>    </span><span style=color:#c82728>ip</span><span>: </span><span style=color:#8959a8>usize</span><span>,
+</span><span>    </span><span style=color:#8e908c>// указатель на ячейку памяти
+</span><span>    </span><span style=color:#c82728>mp</span><span>: </span><span style=color:#8959a8>usize</span><span>,
+</span><span>}
+</span><span>
+</span><span style=color:#8959a8>impl </span><span>Emulator {
+</span><span>    </span><span style=color:#8e908c>// инициализация переменных
+</span><span>    </span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>new</span><span>(</span><span style=color:#f07219>mem_size</span><span>: </span><span style=color:#8959a8>usize</span><span>) -> Emulator {
+</span><span>        Emulator { stack: </span><span style=color:#c99e00>Vec</span><span>::new(), mem: vec![</span><span style=color:#f07219>0</span><span>; mem_size], app: </span><span style=color:#c99e00>Vec</span><span>::new(), ip: </span><span style=color:#f07219>0</span><span>, mp: </span><span style=color:#f07219>0 </span><span>}
+</span><span>    }
+</span><span>}
+</span><span>
+</span><span style=color:#8e908c>// токен валидный для brainfuck?
+</span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>is_valid_token</span><span>(</span><span style=color:#f07219>t</span><span>: </span><span style=color:#8959a8>char</span><span>) -> </span><span style=color:#8959a8>bool </span><span>{
+</span><span>    t </span><span style=color:#3e999f>== </span><span style=color:#839c00>'>' </span><span style=color:#3e999f>||</span><span> t </span><span style=color:#3e999f>== </span><span style=color:#839c00>'<' </span><span style=color:#3e999f>||</span><span> t </span><span style=color:#3e999f>== </span><span style=color:#839c00>'+' </span><span style=color:#3e999f>||</span><span> t </span><span style=color:#3e999f>== </span><span style=color:#839c00>'-' </span><span style=color:#3e999f>||</span><span> t </span><span style=color:#3e999f>== </span><span style=color:#839c00>'.' </span><span style=color:#3e999f>||</span><span> t </span><span style=color:#3e999f>== </span><span style=color:#839c00>',' </span><span style=color:#3e999f>||</span><span> t </span><span style=color:#3e999f>== </span><span style=color:#839c00>'[' </span><span style=color:#3e999f>||</span><span> t </span><span style=color:#3e999f>== </span><span style=color:#839c00>']'
+</span><span>}
+</span><span>
+</span><span style=color:#8959a8>fn </span><span style=color:#4271ae>main</span><span>() {
+</span><span>    </span><span style=color:#8e908c>// создаём объект интерпретатора
+</span><span>    </span><span style=color:#8959a8>let mut</span><span> emulator </span><span style=color:#3e999f>= </span><span>Emulator::new(</span><span style=color:#f07219>30_000</span><span>);
+</span><span>    </span><span style=color:#8e908c>// читаем программу из stdin и выполняем её
+</span><span>    </span><span style=color:#8959a8>match</span><span> emulator.</span><span style=color:#4271ae>from_stdin</span><span>().</span><span style=color:#4271ae>and_then</span><span>(|_| emulator.</span><span style=color:#4271ae>execute</span><span>()) {
+</span><span>        </span><span style=color:#c99e00>Err</span><span>(err) </span><span style=color:#3e999f>=> </span><span>println!(</span><span style=color:#839c00>"error: </span><span>{}</span><span style=color:#839c00>"</span><span>, err),
+</span><span>        </span><span style=color:#3e999f>_ => </span><span>(),
+</span><span>    }
+</span><span>}
+</span></code></pre><h2 id=parsing>Парсинг</h2><p>Начнём с преобразования токена в наш <strong>enum</strong> через реализацию трейта <code>From</code>:<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>impl </span><span style=color:#c99e00>From</span><span><</span><span style=color:#8959a8>char</span><span>> </span><span style=color:#8959a8>for </span><span>Command {
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>from</span><span>(</span><span style=color:#f07219>token</span><span>: </span><span style=color:#8959a8>char</span><span>) -> </span><span style=color:#8959a8>Self </span><span>{
+</span><span>        </span><span style=color:#8959a8>match</span><span> token {
+</span><span>            </span><span style=color:#839c00>'>' </span><span style=color:#3e999f>=> </span><span>Command::Next,
+</span><span>            </span><span style=color:#839c00>'<' </span><span style=color:#3e999f>=> </span><span>Command::Previous,
+</span><span>            </span><span style=color:#839c00>'+' </span><span style=color:#3e999f>=> </span><span>Command::Increment,
+</span><span>            </span><span style=color:#839c00>'-' </span><span style=color:#3e999f>=> </span><span>Command::Decrement,
+</span><span>            </span><span style=color:#839c00>'.' </span><span style=color:#3e999f>=> </span><span>Command::Put,
+</span><span>            </span><span style=color:#839c00>',' </span><span style=color:#3e999f>=> </span><span>Command::Read,
+</span><span>            </span><span style=color:#839c00>'[' </span><span style=color:#3e999f>=> </span><span>Command::LoopBegin(</span><span style=color:#f07219>0</span><span>),
+</span><span>            </span><span style=color:#839c00>']' </span><span style=color:#3e999f>=> </span><span>Command::LoopEnd(</span><span style=color:#f07219>0</span><span>),
+</span><span>            </span><span style=color:#8e908c>// если дошло до этого кода, то где-то в коде проблема!
+</span><span>            token </span><span style=color:#3e999f>=> </span><span>panic!(</span><span style=color:#839c00>"unknown token `{}`"</span><span>, token),
+</span><span>        }
+</span><span>    }
+</span><span>}
+</span></code></pre><p>Дальше реализуем парсинг токенов:<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8e908c>// --- все эти функции написаны в блоке impl Emulator ---
+</span><span>
+</span><span style=color:#8e908c>// чтение программы с stdin
+</span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>from_stdin</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>) -> </span><span style=color:#c99e00>Result</span><span><(), </span><span style=color:#c99e00>String</span><span>> {
+</span><span>    </span><span style=color:#8e908c>// вывод > без перевода строки
+</span><span>    print!(</span><span style=color:#839c00>"> "</span><span>);
+</span><span>    io::stdout().</span><span style=color:#4271ae>flush</span><span>().</span><span style=color:#4271ae>map_err</span><span>(|</span><span style=color:#f07219>e</span><span>| e.</span><span style=color:#4271ae>to_string</span><span>())</span><span style=color:#3e999f>?</span><span>;
+</span><span>
+</span><span>    </span><span style=color:#8e908c>// читаем в буфер весь stdin
+</span><span>    </span><span style=color:#8959a8>let mut</span><span> buffer </span><span style=color:#3e999f>= </span><span style=color:#c99e00>String</span><span>::new();
+</span><span>    io::stdin().</span><span style=color:#4271ae>read_line</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut</span><span> buffer).</span><span style=color:#4271ae>map_err</span><span>(|</span><span style=color:#f07219>e</span><span>| e.</span><span style=color:#4271ae>to_string</span><span>())</span><span style=color:#3e999f>?</span><span>;
+</span><span>
+</span><span>    </span><span style=color:#8e908c>// и отдаём буфер в парсящую функцию
+</span><span>    </span><span style=color:#c82728>self</span><span>.</span><span style=color:#4271ae>from_buffer</span><span>(</span><span style=color:#3e999f>&</span><span>buffer)
+</span><span>}
+</span><span>
+</span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>from_buffer</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>buffer</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>str</span><span>) -> </span><span style=color:#c99e00>Result</span><span><(), </span><span style=color:#c99e00>String</span><span>> {
+</span><span>    </span><span style=color:#8e908c>// цикл по токенам
+</span><span>    </span><span style=color:#8959a8>for</span><span> token </span><span style=color:#3e999f>in</span><span> buffer.</span><span style=color:#4271ae>chars</span><span>() {
+</span><span>        </span><span style=color:#8e908c>// успешно спарсено?
+</span><span>        </span><span style=color:#c82728>self</span><span>.</span><span style=color:#4271ae>parse_token</span><span>(token)</span><span style=color:#3e999f>?</span><span>;
+</span><span>    }
+</span><span>
+</span><span>    </span><span style=color:#8e908c>// валидируем количество скобок []
+</span><span>    </span><span style=color:#8959a8>match </span><span style=color:#c82728>self</span><span>.stack.</span><span style=color:#4271ae>len</span><span>() </span><span style=color:#3e999f>> </span><span style=color:#f07219>0 </span><span>{
+</span><span>        </span><span style=color:#f07219>true </span><span style=color:#3e999f>=> </span><span style=color:#c99e00>Err</span><span>(</span><span style=color:#839c00>"number of brackets does not match"</span><span>.</span><span style=color:#4271ae>to_string</span><span>()),
+</span><span>        </span><span style=color:#f07219>false </span><span style=color:#3e999f>=> </span><span style=color:#c99e00>Ok</span><span>(()),
+</span><span>    }
+</span><span>}
+</span><span>
+</span><span style=color:#8e908c>// парсинг отдельного токена
+</span><span style=color:#8959a8>fn </span><span style=color:#4271ae>parse_token</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>token</span><span>: </span><span style=color:#8959a8>char</span><span>) -> </span><span style=color:#c99e00>Result</span><span><(), </span><span style=color:#c99e00>String</span><span>> {
+</span><span>    </span><span style=color:#8e908c>// нам нужны только токены brainfuck
+</span><span>    </span><span style=color:#8959a8>if </span><span style=color:#4271ae>is_valid_token</span><span>(token) {
+</span><span>        </span><span style=color:#8e908c>// получаем номер текущей ячейки (длина программы)
+</span><span>        </span><span style=color:#8959a8>let</span><span> index </span><span style=color:#3e999f>= </span><span style=color:#c82728>self</span><span>.app.</span><span style=color:#4271ae>len</span><span>();
+</span><span>        </span><span style=color:#8e908c>// преобразуем char в Command через трейт From
+</span><span>        </span><span style=color:#8959a8>let</span><span> cmd </span><span style=color:#3e999f>= </span><span style=color:#8959a8>match</span><span> token.</span><span style=color:#4271ae>into</span><span>() {
+</span><span>            </span><span style=color:#8e908c>// если это `[`
+</span><span>            command </span><span style=color:#3e999f>@ </span><span>Command::LoopBegin(</span><span style=color:#3e999f>_</span><span>) </span><span style=color:#3e999f>=> </span><span>{
+</span><span>                </span><span style=color:#8e908c>// то запоминаем индекс команды
+</span><span>                </span><span style=color:#c82728>self</span><span>.stack.</span><span style=color:#4271ae>push</span><span>(index);
+</span><span>                </span><span style=color:#8e908c>// и возвращаем её
+</span><span>                command
+</span><span>            }
+</span><span>            </span><span style=color:#8e908c>// если `[`
+</span><span>            Command::LoopEnd(</span><span style=color:#3e999f>_</span><span>) </span><span style=color:#3e999f>=> </span><span>{
+</span><span>                </span><span style=color:#8e908c>// вытаскиваем последний индекс
+</span><span>                </span><span style=color:#8959a8>let</span><span> start </span><span style=color:#3e999f>= </span><span style=color:#8959a8>match </span><span style=color:#c82728>self</span><span>.stack.</span><span style=color:#4271ae>pop</span><span>() {
+</span><span>                    </span><span style=color:#c99e00>Some</span><span>(value) </span><span style=color:#3e999f>=></span><span> value,
+</span><span>                    </span><span style=color:#c99e00>None </span><span style=color:#3e999f>=> </span><span style=color:#8959a8>return </span><span style=color:#c99e00>Err</span><span>(</span><span style=color:#839c00>"loop start not found"</span><span>.</span><span style=color:#4271ae>to_string</span><span>()),
+</span><span>                };
+</span><span>                </span><span style=color:#8e908c>// правим начало цикла устанавливая  V вот этот индекс (он указывает на конец)
+</span><span>                </span><span style=color:#c82728>self</span><span>.app[start] </span><span style=color:#3e999f>= </span><span>Command::LoopBegin(index);
+</span><span>                </span><span style=color:#8e908c>// и добавляем команду с концом цикла, который смотрит на начало
+</span><span>                Command::LoopEnd(start)
+</span><span>            }
+</span><span>            </span><span style=color:#8e908c>// любые другие команды просто отдаём дальше
+</span><span>            cmd </span><span style=color:#3e999f>=></span><span> cmd,
+</span><span>        };
+</span><span>        </span><span style=color:#8e908c>// добавляем команду в массив программы
+</span><span>        </span><span style=color:#c82728>self</span><span>.app.</span><span style=color:#4271ae>push</span><span>(cmd);
+</span><span>    }
+</span><span>    </span><span style=color:#8e908c>// всё ок
+</span><span>    </span><span style=color:#c99e00>Ok</span><span>(())
+</span><span>}
+</span></code></pre><h2 id=interpretatsiia>Интерпретация</h2><p>Теперь же перейдём к коду интерпретации:<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8e908c>// --- все эти функции написаны в блоке impl Emulator ---
+</span><span>
+</span><span style=color:#8e908c>// один шаг выполнения
+</span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>step</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>) -> </span><span style=color:#c99e00>Result</span><span><(), </span><span style=color:#c99e00>String</span><span>> {
+</span><span>    </span><span style=color:#8e908c>// матчим текущую команду
+</span><span>    </span><span style=color:#8959a8>match </span><span style=color:#c82728>self</span><span>.app[</span><span style=color:#c82728>self</span><span>.ip] {
+</span><span>        Command::Next </span><span style=color:#3e999f>=> </span><span>{
+</span><span>            </span><span style=color:#8e908c>// проверка на выход за границы (верхняя граница)
+</span><span>            </span><span style=color:#8959a8>if </span><span style=color:#c82728>self</span><span>.mp </span><span style=color:#3e999f>+ </span><span style=color:#f07219>1 </span><span style=color:#3e999f>== </span><span style=color:#c82728>self</span><span>.mem.</span><span style=color:#4271ae>len</span><span>() {
+</span><span>                </span><span style=color:#8959a8>return </span><span style=color:#c99e00>Err</span><span>(</span><span style=color:#839c00>"out of memory"</span><span>.</span><span style=color:#4271ae>to_string</span><span>());
+</span><span>            }
+</span><span>            </span><span style=color:#8e908c>// увеличиваем индекс на ячейку памяти
+</span><span>            </span><span style=color:#c82728>self</span><span>.mp </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>        }
+</span><span>        Command::Previous </span><span style=color:#3e999f>=> </span><span>{
+</span><span>            </span><span style=color:#8e908c>// проверка нижней границы памяти
+</span><span>            </span><span style=color:#8959a8>if </span><span style=color:#c82728>self</span><span>.mp </span><span style=color:#3e999f>== </span><span style=color:#f07219>0 </span><span>{
+</span><span>                </span><span style=color:#8959a8>return </span><span style=color:#c99e00>Err</span><span>(</span><span style=color:#839c00>"cannot access negative memory index"</span><span>.</span><span style=color:#4271ae>to_string</span><span>());
+</span><span>            }
+</span><span>            </span><span style=color:#8e908c>// уменьшаем индекс на ячейку памяти
+</span><span>            </span><span style=color:#c82728>self</span><span>.mp </span><span style=color:#3e999f>-= </span><span style=color:#f07219>1</span><span>;
+</span><span>        }
+</span><span>        Command::Increment </span><span style=color:#3e999f>=> </span><span>{
+</span><span>            </span><span style=color:#8e908c>// добавим к текущей ячейке единицу с учётом возможного переполнения, т.к. у нас ячейки имеют тип u8
+</span><span>            </span><span style=color:#c82728>self</span><span>.mem[</span><span style=color:#c82728>self</span><span>.mp] </span><span style=color:#3e999f>= </span><span style=color:#c82728>self</span><span>.mem[</span><span style=color:#c82728>self</span><span>.mp].</span><span style=color:#4271ae>overflowing_add</span><span>(</span><span style=color:#f07219>1</span><span>).</span><span style=color:#f07219>0</span><span>;
+</span><span>        }
+</span><span>        Command::Decrement </span><span style=color:#3e999f>=> </span><span>{
+</span><span>            </span><span style=color:#8e908c>// уменьшаем значение ячейки на единицу (не забываем про переполнение)
+</span><span>            </span><span style=color:#c82728>self</span><span>.mem[</span><span style=color:#c82728>self</span><span>.mp] </span><span style=color:#3e999f>= </span><span style=color:#c82728>self</span><span>.mem[</span><span style=color:#c82728>self</span><span>.mp].</span><span style=color:#4271ae>overflowing_sub</span><span>(</span><span style=color:#f07219>1</span><span>).</span><span style=color:#f07219>0</span><span>;
+</span><span>        }
+</span><span>        Command::Put </span><span style=color:#3e999f>=> </span><span>{
+</span><span>            </span><span style=color:#8e908c>// выводит текущее значение в stdout
+</span><span>            print!(</span><span style=color:#839c00>"</span><span>{}</span><span style=color:#839c00>"</span><span>, </span><span style=color:#c82728>self</span><span>.mem[</span><span style=color:#c82728>self</span><span>.mp] </span><span style=color:#3e999f>as </span><span style=color:#8959a8>char</span><span>);
+</span><span>            io::stdout().</span><span style=color:#4271ae>flush</span><span>().</span><span style=color:#4271ae>map_err</span><span>(|</span><span style=color:#f07219>e</span><span>| e.</span><span style=color:#4271ae>to_string</span><span>())</span><span style=color:#3e999f>?</span><span>;
+</span><span>        }
+</span><span>        Command::Read </span><span style=color:#3e999f>=> </span><span>{
+</span><span>            </span><span style=color:#8e908c>// берём из потока stdin один байт и записываем в память
+</span><span>            </span><span style=color:#c82728>self</span><span>.mem[</span><span style=color:#c82728>self</span><span>.mp] </span><span style=color:#3e999f>= </span><span style=color:#8959a8>match </span><span>io::stdin().</span><span style=color:#4271ae>bytes</span><span>().</span><span style=color:#4271ae>next</span><span>() {
+</span><span>                </span><span style=color:#c99e00>Some</span><span>(</span><span style=color:#c99e00>Ok</span><span>(value)) </span><span style=color:#3e999f>=></span><span> value,
+</span><span>                </span><span style=color:#c99e00>Some</span><span>(</span><span style=color:#c99e00>Err</span><span>(err)) </span><span style=color:#3e999f>=> </span><span style=color:#8959a8>return </span><span style=color:#c99e00>Err</span><span>(err.</span><span style=color:#4271ae>to_string</span><span>()),
+</span><span>                </span><span style=color:#c99e00>None </span><span style=color:#3e999f>=> </span><span style=color:#8959a8>return </span><span style=color:#c99e00>Err</span><span>(</span><span style=color:#839c00>"cannot read byte from stdin"</span><span>.</span><span style=color:#4271ae>to_string</span><span>()),
+</span><span>            }
+</span><span>        }
+</span><span>        Command::LoopBegin(index) </span><span style=color:#3e999f>=> </span><span>{
+</span><span>            </span><span style=color:#8e908c>// если в текущей ячейки ноль, то
+</span><span>            </span><span style=color:#8959a8>if </span><span style=color:#c82728>self</span><span>.mem[</span><span style=color:#c82728>self</span><span>.mp] </span><span style=color:#3e999f>== </span><span style=color:#f07219>0 </span><span>{
+</span><span>                </span><span style=color:#8e908c>// выходим из текущего цикла установкой нового ip
+</span><span>                </span><span style=color:#c82728>self</span><span>.ip </span><span style=color:#3e999f>=</span><span> index;
+</span><span>            }
+</span><span>        }
+</span><span>        Command::LoopEnd(index) </span><span style=color:#3e999f>=> </span><span>{
+</span><span>            </span><span style=color:#8e908c>// если не ноль, то
+</span><span>            </span><span style=color:#8959a8>if </span><span style=color:#c82728>self</span><span>.mem[</span><span style=color:#c82728>self</span><span>.mp] </span><span style=color:#3e999f>!= </span><span style=color:#f07219>0 </span><span>{
+</span><span>                </span><span style=color:#8e908c>// возвращаемся в начало цикла
+</span><span>                </span><span style=color:#c82728>self</span><span>.ip </span><span style=color:#3e999f>=</span><span> index;
+</span><span>            }
+</span><span>        }
+</span><span>    }
+</span><span>    </span><span style=color:#8e908c>// увеличиваем указатель на текущую инструкцию
+</span><span>    </span><span style=color:#c82728>self</span><span>.ip </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>
+</span><span>    </span><span style=color:#c99e00>Ok</span><span>(())
+</span><span>}
+</span><span>
+</span><span style=color:#8e908c>// выполнить всю программу
+</span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>execute</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>) -> </span><span style=color:#c99e00>Result</span><span><(), </span><span style=color:#c99e00>String</span><span>> {
+</span><span>    </span><span style=color:#8e908c>// выполняем программу, пока ip не выйдет за границы программы
+</span><span>    </span><span style=color:#8959a8>while </span><span style=color:#c82728>self</span><span>.ip </span><span style=color:#3e999f>< </span><span style=color:#c82728>self</span><span>.app.</span><span style=color:#4271ae>len</span><span>() {
+</span><span>        </span><span style=color:#c82728>self</span><span>.</span><span style=color:#4271ae>step</span><span>()</span><span style=color:#3e999f>?</span><span>;
+</span><span>    }
+</span><span>
+</span><span>    </span><span style=color:#c99e00>Ok</span><span>(())
+</span><span>}
+</span></code></pre><h1 id=test>Тест</h1><p>Теперь можно собрать приложение и проверить работу "Hello World!":<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> echo </span><span style=color:#839c00>"++++++++++[>+++++++>++++++++++>+++>+<<<&LT-]>++.>+.+++++++..+++.>++.<<+++++++++++++++.>.+++.------.--------.>+.>." </span><span style=color:#3e999f>| </span><span style=color:#c82728>./app
+</span><span style=color:#3e999f>></span><span> Hello </span><span style=color:#c82728>World!
+</span></code></pre><p>Больше примеров для проверки можете найти в интернете или написать самим!<p>Я оставил пару примеров <a href=https://github.com/FreeCX/post-brainfuck/tree/main/examples>в репозитории</a>, но для более удобной работы вам предстоит реализовать загрузку кода из файла.<h1 id=zakliuchenie>Заключение</h1><p>В следующей статье рассмотрим компиляцию brainfuck в исполняемое приложение!<p>Весь написанный код можно взять <a href=https://github.com/FreeCX/post-brainfuck/releases/tag/interpreter>в репозитории</a> и там же можно найти <a href=https://github.com/FreeCX/post-brainfuck/c/>C</a>, <a href=https://github.com/FreeCX/post-brainfuck/tree/cpp-version>C++</a>, <a href=https://github.com/FreeCX/post-brainfuck/tree/go-version>Go</a> версии.<p>Всем пока!<h1 id=chto-pochitat>Что почитать</h1><ol><li><a href=https://ru.wikipedia.org/wiki/Brainfuck>Brainfuck</a></ol></article><div class=back><a href=https://freecx.github.io/>Назад</a></div><div class=footer><span>Также читайте <a title="ты сам сломал ссылку, так что ничего личного" href=https://antoniii.github.io/> <s>antoniii</s> </a> <a href=https://citrux.github.io/>citrux</a> <a href=https://sputnikas.github.io/>sputnikas</a> </span></div><script>let msg=` А спонсор статей в моём блоге -- моя лень -- спонсор статей.`;[`=`.repeat(msg.length+ 1),msg,`=`.repeat(msg.length+ 1)].forEach(a=>console.warn(a))</script>

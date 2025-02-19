@@ -1,0 +1,576 @@
+<!doctype html><html lang=ru><head><meta charset=utf-8><meta content="IE=edge" http-equiv=X-UA-Compatible><meta content="width=device-width,initial-scale=1" name=viewport><title>Пишем эмулятор простых логических схем</title><meta content="Кодерный понедельник" name=description><meta content=https://freecx.github.io/touch-icon.png property=og:image><link href=https://code.cdn.mozilla.net/fonts/fira.css rel=stylesheet><link href=https://freecx.github.io/favicon.png rel=icon><link href=https://freecx.github.io/touch-icon.png rel=apple-touch-icon><link href=https://freecx.github.io/main.css rel=stylesheet><link href=https://freecx.github.io/syntax.css rel=stylesheet><body><aside class=logo><a href=https://github.com/FreeCX> <img class=gravatar src=https://freecx.github.io/avatar.png> </a><span class=logo-prompt>Я на github</span></aside><article><div class=center><h1>Пишем эмулятор простых логических схем</h1><time>14 September 2017</time></div><div class=divider></div><p>Сегодня мы реализуем программу для симуляции логических схем.<p>Конечно с помощью неё нельзя будет реализовать такие схемы как:<ul><li>триггер<li>ячейка памяти<li>и многие другие (все те, что имеют обратную связь)</ul><p>но для написания простого сумматора - самое то!<h1 id=bazovye-sostavliaiushchie>Базовые составляющие</h1><p>Для простоты реализации писать будем на Python. Забегу вперёд и скажу, что наша базовая реализация займёт не больше 100 строчек кода. Можно и меньше, но мы за этим не будем гнаться.<p>Давайте определим что нам будет нужно чтобы эмулировать работу самого простого элемента?<ol><li>Он должен иметь входы/выходы<li>Иметь возможность получать сигнал на вход и отдавать на выходе<li>Выполнять некое преобразование между входным и выходным сигналом</ol><p>Для определенность возьмём элемент <code>NAND</code>. В привычных для многих функциях он будет выглядеть так:<pre style=color:#111;background-color:#f9f9f9><code><span>X NAND Y = NOT (X AND Y)
+</span></code></pre><p>Это базовый элемент, который используется в электронике и он послужит нам отправной базой в нашей программе.<p>Напишем каркас для нашего элемента.<h1 id=pishem-bazovyi-element>Пишем базовый элемент</h1><pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>class </span><span style=color:#c99e00>ElementNAND</span><span>:
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>__init__</span><span>(</span><span style=color:#f07219>self</span><span>):
+</span><span>        </span><span style=color:#8e908c># у NAND два входа
+</span><span>        </span><span style=color:#c82728>self</span><span>.input </span><span style=color:#3e999f>= </span><span>[</span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>0</span><span>]
+</span><span>        </span><span style=color:#8e908c># и один выход
+</span><span>        </span><span style=color:#c82728>self</span><span>.output </span><span style=color:#3e999f>= </span><span>[</span><span style=color:#f07219>0</span><span>]
+</span><span>
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>execute</span><span>(</span><span style=color:#f07219>self</span><span>):
+</span><span>        </span><span style=color:#8e908c># X NAND Y = NOT (X AND Y) = (NOT X) or (NOT Y)
+</span><span>        </span><span style=color:#8e908c># см. законы де Моргана
+</span><span>        </span><span style=color:#c82728>self</span><span>.output[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>= </span><span>(</span><span style=color:#3e999f>not </span><span style=color:#c82728>self</span><span>.input[</span><span style=color:#f07219>0</span><span>]) </span><span style=color:#3e999f>% </span><span style=color:#f07219>2 </span><span style=color:#3e999f>or </span><span>(</span><span style=color:#3e999f>not </span><span style=color:#c82728>self</span><span>.input[</span><span style=color:#f07219>1</span><span>]) </span><span style=color:#3e999f>% </span><span style=color:#f07219>2
+</span><span>        </span><span style=color:#8e908c># и выбирай любое из условий :)
+</span><span>        </span><span style=color:#8e908c># self.output[0] = (not (self.input[0] and self.input[1])) % 2
+</span><span>        </span><span style=color:#8e908c>"""
+</span><span style=color:#8e908c>        для удобства отображения input и output содержат числа, а не булевый тип
+</span><span style=color:#8e908c>        и поэтому нужно брать остаток от деления!
+</span><span style=color:#8e908c>        """
+</span></code></pre><p>Теперь мы можем проверить работоспособность нашего элемента. Напишем для него небольшую программу, которая пройдёт по таблице истинности и выведет результаты.<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>from </span><span>itertools </span><span style=color:#8959a8>import </span><span>product
+</span><span>
+</span><span style=color:#8e908c>""" ... место для класса ElementNAND ... """
+</span><span>
+</span><span>a </span><span style=color:#3e999f>= </span><span style=color:#c82728>ElementNAND</span><span style=color:#4271ae>()
+</span><span style=color:#8959a8>for </span><span>signal </span><span style=color:#8959a8>in </span><span style=color:#c82728>product</span><span style=color:#4271ae>(range(</span><span style=color:#f07219>2</span><span style=color:#4271ae>), </span><span style=color:#f07219>repeat</span><span style=color:#3e999f>=</span><span style=color:#f07219>2</span><span style=color:#4271ae>)</span><span>:
+</span><span>    a.input </span><span style=color:#3e999f>= </span><span style=color:#c99e00>list</span><span style=color:#4271ae>(signal)
+</span><span>    </span><span style=color:#4271ae>a.</span><span style=color:#c82728>execute</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#4271ae>print(</span><span style=color:#839c00>'</span><span>{}</span><span style=color:#839c00> NAND </span><span>{}</span><span style=color:#839c00> = </span><span>{}</span><span style=color:#839c00>'</span><span style=color:#4271ae>.</span><span style=color:#c82728>format</span><span style=color:#4271ae>(</span><span style=color:#3e999f>*</span><span style=color:#4271ae>a.input, a.output[</span><span style=color:#f07219>0</span><span style=color:#4271ae>]))
+</span></code></pre><p>Запустим и посмотрим на результат<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>0</span><span style=color:#4271ae> NAND 0 = 1
+</span><span style=color:#c82728>0</span><span style=color:#4271ae> NAND 1 = 1
+</span><span style=color:#c82728>1</span><span style=color:#4271ae> NAND 0 = 1
+</span><span style=color:#c82728>1</span><span style=color:#4271ae> NAND 1 = 0
+</span></code></pre><p>Отлично, результат соответствует таблице истинности!<h1 id=uslozhniaem-element>Усложняем элемент</h1><p>Теперь обобщим наши действия, т.е. введём ещё пару правил:<ul><li>пусть элемент может содержать в себе произвольное количество других элементов<li>элементы внутри другого элемента можно соединять проводами</ul><p>Что же это значит для нас?<p>Только то, что нужно будет:<ul><li>задавать при инициализации количество входов и выходов<li>определять элементы и провода<li>добавить пару функций отвечающие за работу с проводами и новыми элементами<li>переделать функцию <code>execute</code></ul><p>Начнём по порядку<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>class </span><span style=color:#c99e00>Element</span><span>:
+</span><span>    </span><span style=color:#8e908c>"""
+</span><span style=color:#8e908c>        input_w  -- количество входных проводов
+</span><span style=color:#8e908c>        output_w -- количество выходных проводов
+</span><span style=color:#8e908c>        type     -- тип элемента ('составной' или 'NAND')
+</span><span style=color:#8e908c>    """
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>__init__</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>input_w</span><span>, </span><span style=color:#f07219>output_w</span><span>, </span><span style=color:#f07219>type</span><span style=color:#3e999f>=</span><span style=color:#839c00>'составной'</span><span>):
+</span><span>        </span><span style=color:#8e908c># инициализируем нулями массивы входов и выходов
+</span><span>        </span><span style=color:#c82728>self</span><span>.input </span><span style=color:#3e999f>= </span><span>[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>* </span><span>input_w
+</span><span>        </span><span style=color:#c82728>self</span><span>.output </span><span style=color:#3e999f>= </span><span>[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>* </span><span>output_w
+</span><span>        </span><span style=color:#8e908c># указываем тип элемента
+</span><span>        </span><span style=color:#c82728>self</span><span>.type </span><span style=color:#3e999f>= </span><span style=color:#4271ae>type
+</span><span>        </span><span style=color:#8e908c># создаём список для внутренних элементов
+</span><span>        </span><span style=color:#c82728>self</span><span>.elements </span><span style=color:#3e999f>= </span><span>[]
+</span><span>        </span><span style=color:#8e908c># создаём список соединяющих проводов
+</span><span>        </span><span style=color:#c82728>self</span><span>.wires </span><span style=color:#3e999f>= </span><span>[]
+</span></code></pre><p>Наверное нужно остановится на списках <code>elements</code> и <code>wires</code>.<p><code>elements</code> будет содержать объекты <code>Element</code> к которым можно будет обращаться по индексу, а <code>wires</code> будет содержать все связи входных и выходных проводов между элементами.<p>Пойдём дальше и добавим функции для работы с элементами и проводами<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>def </span><span style=color:#4271ae>push_element</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>element</span><span>):
+</span><span>    </span><span style=color:#8e908c># проталкиваем элемент в список
+</span><span>    </span><span style=color:#c82728>self</span><span style=color:#4271ae>.elements.</span><span style=color:#c82728>append</span><span style=color:#4271ae>(element)
+</span><span>    </span><span style=color:#8e908c># и возвращаем его номер в списке
+</span><span>    </span><span style=color:#8959a8>return </span><span style=color:#4271ae>len(</span><span style=color:#c82728>self</span><span style=color:#4271ae>.elements) </span><span style=color:#3e999f>- </span><span style=color:#f07219>1
+</span><span>
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>connect_wire</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>wire_a</span><span>, </span><span style=color:#f07219>wire_b</span><span>):
+</span><span>    </span><span style=color:#8e908c># добавляем провод в список
+</span><span>    </span><span style=color:#c82728>self</span><span style=color:#4271ae>.wires.</span><span style=color:#c82728>append</span><span style=color:#4271ae>((wire_a, wire_b))
+</span></code></pre><p>Вроде всё просто! Да?<p>А теперь самое главное, функция <code>execute</code>.<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>def </span><span style=color:#4271ae>execute</span><span>(</span><span style=color:#f07219>self</span><span>):
+</span><span>    </span><span style=color:#8e908c># если элемент NAND, то считаем по формуле
+</span><span>    </span><span style=color:#8959a8>if </span><span style=color:#c82728>self</span><span>.type </span><span style=color:#3e999f>== </span><span style=color:#839c00>'NAND'</span><span>:
+</span><span>        </span><span style=color:#8e908c>""" наш прошлый код """
+</span><span>        </span><span style=color:#8e908c># X NAND Y = NOT (X AND Y) = (NOT X) or (NOT Y)
+</span><span>        </span><span style=color:#8e908c># см. законы де Моргана
+</span><span>        </span><span style=color:#c82728>self</span><span>.output[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>= </span><span>(</span><span style=color:#3e999f>not </span><span style=color:#c82728>self</span><span>.input[</span><span style=color:#f07219>0</span><span>]) </span><span style=color:#3e999f>% </span><span style=color:#f07219>2 </span><span style=color:#3e999f>or </span><span>(</span><span style=color:#3e999f>not </span><span style=color:#c82728>self</span><span>.input[</span><span style=color:#f07219>1</span><span>]) </span><span style=color:#3e999f>% </span><span style=color:#f07219>2
+</span><span>        </span><span style=color:#8e908c># и выбирай любое из условий :)
+</span><span>        </span><span style=color:#8e908c># self.output[0] = (not (self.input[0] and self.input[1])) % 2
+</span><span>    </span><span style=color:#8e908c># иначе, если элемент составной:
+</span><span>    </span><span style=color:#8959a8>elif </span><span style=color:#c82728>self</span><span>.type </span><span style=color:#3e999f>== </span><span style=color:#839c00>'составной'</span><span>:
+</span><span>        </span><span style=color:#8e908c>""" ... некоторый код ... """
+</span></code></pre><p>Остановимся на данном моменте и подумаем...<p>В голову сразу приходит несколько вопросов:<ol><li>Как исполнять код для вложенных элементов?<li>Как идентифицировать входные и выходные провода?<li>Как вообще различить внутренние и внешние провода?</ol><p>На 2 и 3 вопрос можно ответить сразу:<ul><li>ввести <code>in_self</code> и <code>out_self</code> — для входов и выходов данного элемента<li>и <code>in</code> и <code>out</code> — для внутренних элементов</ul><p>Плюс будем передавать идентификатор элемента и номер входа/выхода, т.е. когда мы будем соединять элементы, то будем использовать следующий код<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#4271ae>element.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, e_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span></code></pre><p>где <code>element</code> — имя самого элемента, <code>('in_self', 0)</code> — нулевой вход у этого элемента, а <code>('in', e_id, 0)</code> — вход у внутреннего элемента <code>e_id</code> на нулевом проводе<p>Для ответа на первый вопрос нам нужно либо реализовать <em>хитрый</em> алгоритм, который будет обходить все элементы в определенном порядке, либо <em>схалтурить</em> и просто последовательно идти по проводам и выполнять код на элементе только в определенный момент (когда выставлены все сигналы на входе). В данном случае нам только придётся последовательно указывать провода, а то логика вычисления может быть нарушена и мы получим неверный результат.<p>Я думаю вы уже поняли каким путём мы пойдём :)<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>elif </span><span style=color:#c82728>self</span><span>.type </span><span style=color:#3e999f>== </span><span style=color:#839c00>'составной'</span><span>:
+</span><span>    </span><span style=color:#8e908c>"""
+</span><span style=color:#8e908c>    идём по всем проводам, где
+</span><span style=color:#8e908c>        from_e -- начало провода
+</span><span style=color:#8e908c>          to_e -- конец провода
+</span><span style=color:#8e908c>    """
+</span><span>    </span><span style=color:#8959a8>for </span><span>from_e, to_e </span><span style=color:#8959a8>in </span><span style=color:#c82728>self</span><span>.wires:
+</span><span>        </span><span style=color:#8e908c># если from_e -- вход у элемента
+</span><span>        </span><span style=color:#8959a8>if </span><span>from_e[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span style=color:#839c00>'in_self'</span><span>:
+</span><span>            wire </span><span style=color:#3e999f>= </span><span>from_e[</span><span style=color:#f07219>1</span><span>]
+</span><span>            </span><span style=color:#8e908c># запоминаем установленных вход во временную переменную
+</span><span>            result </span><span style=color:#3e999f>= </span><span style=color:#c82728>self</span><span>.input[wire]
+</span><span>        </span><span style=color:#8e908c># если from_e -- выход у внутреннего элемента
+</span><span>        </span><span style=color:#8959a8>elif </span><span>from_e[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span style=color:#839c00>'out'</span><span>:
+</span><span>            </span><span style=color:#8e908c># вытаскиваем номер элемента и провод из from_e
+</span><span>            idN, wire </span><span style=color:#3e999f>= </span><span>from_e[</span><span style=color:#f07219>1</span><span>:]
+</span><span>            </span><span style=color:#8e908c># и запоминаем установленных выход во временную переменную
+</span><span>            result </span><span style=color:#3e999f>= </span><span style=color:#c82728>self</span><span>.elements[idN].output[wire]
+</span><span>        </span><span style=color:#8e908c># если to_e -- вход внутреннего элемента
+</span><span>        </span><span style=color:#8959a8>if </span><span>to_e[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span style=color:#839c00>'in'</span><span>:
+</span><span>            </span><span style=color:#8e908c># вытаскиваем номер элемента и провод
+</span><span>            idN, wire </span><span style=color:#3e999f>= </span><span>to_e[</span><span style=color:#f07219>1</span><span>:]
+</span><span>            </span><span style=color:#8e908c># устанавливаем значение сигнала на проводе используя ту самую переменную
+</span><span>            </span><span style=color:#c82728>self</span><span>.elements[idN].input[wire] </span><span style=color:#3e999f>= </span><span>result
+</span><span>            </span><span style=color:#8e908c># и выполняем код внутри элемента
+</span><span>            </span><span style=color:#c82728>self</span><span>.elements[idN]</span><span style=color:#4271ae>.</span><span style=color:#c82728>execute</span><span style=color:#4271ae>()
+</span><span>        </span><span style=color:#8e908c># если to_e -- выход у самого элемента
+</span><span>        </span><span style=color:#8959a8>elif </span><span>to_e[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span style=color:#839c00>'out_self'</span><span>:
+</span><span>            wire </span><span style=color:#3e999f>= </span><span>to_e[</span><span style=color:#f07219>1</span><span>]
+</span><span>            </span><span style=color:#8e908c># то просто записываем результат на его выход
+</span><span>            </span><span style=color:#c82728>self</span><span>.output[wire] </span><span style=color:#3e999f>= </span><span>result
+</span></code></pre><p>Вот и всё! Конечно код не супер идеальный и скорее всего с ошибкой в логике исполнения, но он работает :)<p>И для миниатюрного симулятора логики этого будет достаточно!<p>Полный листинг кода<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>class </span><span style=color:#c99e00>Element</span><span>:
+</span><span>    </span><span style=color:#8e908c>"""
+</span><span style=color:#8e908c>        input_w  -- количество входных проводов
+</span><span style=color:#8e908c>        output_w -- количество выходных проводов
+</span><span style=color:#8e908c>        type     -- тип элемента ('составной' или 'NAND')
+</span><span style=color:#8e908c>    """
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>__init__</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>input_w</span><span>, </span><span style=color:#f07219>output_w</span><span>, </span><span style=color:#f07219>type</span><span style=color:#3e999f>=</span><span style=color:#839c00>'составной'</span><span>):
+</span><span>        </span><span style=color:#8e908c># инициализируем нулями массивы входов и выходов
+</span><span>        </span><span style=color:#c82728>self</span><span>.input </span><span style=color:#3e999f>= </span><span>[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>* </span><span>input_w
+</span><span>        </span><span style=color:#c82728>self</span><span>.output </span><span style=color:#3e999f>= </span><span>[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>* </span><span>output_w
+</span><span>        </span><span style=color:#8e908c># указываем тип элемента
+</span><span>        </span><span style=color:#c82728>self</span><span>.type </span><span style=color:#3e999f>= </span><span style=color:#4271ae>type
+</span><span>        </span><span style=color:#8e908c># создаём список для внутренних элементов
+</span><span>        </span><span style=color:#c82728>self</span><span>.elements </span><span style=color:#3e999f>= </span><span>[]
+</span><span>        </span><span style=color:#8e908c># создаём список соединяющих проводов
+</span><span>        </span><span style=color:#c82728>self</span><span>.wires </span><span style=color:#3e999f>= </span><span>[]
+</span><span>
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>push_element</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>element</span><span>):
+</span><span>        </span><span style=color:#8e908c># проталкиваем элемент в список
+</span><span>        </span><span style=color:#c82728>self</span><span style=color:#4271ae>.elements.</span><span style=color:#c82728>append</span><span style=color:#4271ae>(element)
+</span><span>        </span><span style=color:#8e908c># и возвращаем его номер в списке
+</span><span>        </span><span style=color:#8959a8>return </span><span style=color:#4271ae>len(</span><span style=color:#c82728>self</span><span style=color:#4271ae>.elements) </span><span style=color:#3e999f>- </span><span style=color:#f07219>1
+</span><span>
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>connect_wire</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>wire_a</span><span>, </span><span style=color:#f07219>wire_b</span><span>):
+</span><span>        </span><span style=color:#8e908c># добавляем провод в список
+</span><span>        </span><span style=color:#c82728>self</span><span style=color:#4271ae>.wires.</span><span style=color:#c82728>append</span><span style=color:#4271ae>((wire_a, wire_b))
+</span><span>
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>execute</span><span>(</span><span style=color:#f07219>self</span><span>):
+</span><span>        </span><span style=color:#8e908c># если элемент NAND, то считаем по формуле
+</span><span>        </span><span style=color:#8959a8>if </span><span style=color:#c82728>self</span><span>.type </span><span style=color:#3e999f>== </span><span style=color:#839c00>'NAND'</span><span>:
+</span><span>            </span><span style=color:#8e908c># X NAND Y = NOT (X AND Y) = (NOT X) or (NOT Y)
+</span><span>            </span><span style=color:#8e908c># см. законы де Моргана
+</span><span>            </span><span style=color:#c82728>self</span><span>.output[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>= </span><span>(</span><span style=color:#3e999f>not </span><span style=color:#c82728>self</span><span>.input[</span><span style=color:#f07219>0</span><span>]) </span><span style=color:#3e999f>% </span><span style=color:#f07219>2 </span><span style=color:#3e999f>or </span><span>(</span><span style=color:#3e999f>not </span><span style=color:#c82728>self</span><span>.input[</span><span style=color:#f07219>1</span><span>]) </span><span style=color:#3e999f>% </span><span style=color:#f07219>2
+</span><span>            </span><span style=color:#8e908c># и выбирай любое из условий :)
+</span><span>            </span><span style=color:#8e908c># self.output[0] = (not (self.input[0] and self.input[1])) % 2
+</span><span>        </span><span style=color:#8e908c># иначе, если элемент составной:
+</span><span>        </span><span style=color:#8959a8>elif </span><span style=color:#c82728>self</span><span>.type </span><span style=color:#3e999f>== </span><span style=color:#839c00>'составной'</span><span>:
+</span><span>            </span><span style=color:#8e908c>"""
+</span><span style=color:#8e908c>            идём по всем проводам, где
+</span><span style=color:#8e908c>                from_e -- начало провода
+</span><span style=color:#8e908c>                  to_e -- конец провода
+</span><span style=color:#8e908c>            """
+</span><span>            </span><span style=color:#8959a8>for </span><span>from_e, to_e </span><span style=color:#8959a8>in </span><span style=color:#c82728>self</span><span>.wires:
+</span><span>                </span><span style=color:#8e908c># если from_e -- вход у элемента
+</span><span>                </span><span style=color:#8959a8>if </span><span>from_e[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span style=color:#839c00>'in_self'</span><span>:
+</span><span>                    wire </span><span style=color:#3e999f>= </span><span>from_e[</span><span style=color:#f07219>1</span><span>]
+</span><span>                    </span><span style=color:#8e908c># запоминаем установленных вход во временную переменную
+</span><span>                    result </span><span style=color:#3e999f>= </span><span style=color:#c82728>self</span><span>.input[wire]
+</span><span>                </span><span style=color:#8e908c># если from_e -- выход у внутреннего элемента
+</span><span>                </span><span style=color:#8959a8>elif </span><span>from_e[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span style=color:#839c00>'out'</span><span>:
+</span><span>                    </span><span style=color:#8e908c># вытаскиваем номер элемента и провод из from_e
+</span><span>                    idN, wire </span><span style=color:#3e999f>= </span><span>from_e[</span><span style=color:#f07219>1</span><span>:]
+</span><span>                    </span><span style=color:#8e908c># и запоминаем установленных выход во временную переменную
+</span><span>                    result </span><span style=color:#3e999f>= </span><span style=color:#c82728>self</span><span>.elements[idN].output[wire]
+</span><span>                </span><span style=color:#8e908c># если to_e -- вход внутреннего элемента
+</span><span>                </span><span style=color:#8959a8>if </span><span>to_e[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span style=color:#839c00>'in'</span><span>:
+</span><span>                    </span><span style=color:#8e908c># вытаскиваем номер элемента и провод
+</span><span>                    idN, wire </span><span style=color:#3e999f>= </span><span>to_e[</span><span style=color:#f07219>1</span><span>:]
+</span><span>                    </span><span style=color:#8e908c># устанавливаем значение сигнала на проводе используя ту самую переменную
+</span><span>                    </span><span style=color:#c82728>self</span><span>.elements[idN].input[wire] </span><span style=color:#3e999f>= </span><span>result
+</span><span>                    </span><span style=color:#8e908c># и выполняем код внутри элемента
+</span><span>                    </span><span style=color:#c82728>self</span><span>.elements[idN]</span><span style=color:#4271ae>.</span><span style=color:#c82728>execute</span><span style=color:#4271ae>()
+</span><span>                </span><span style=color:#8e908c># если to_e -- выход у самого элемента
+</span><span>                </span><span style=color:#8959a8>elif </span><span>to_e[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span style=color:#839c00>'out_self'</span><span>:
+</span><span>                    wire </span><span style=color:#3e999f>= </span><span>to_e[</span><span style=color:#f07219>1</span><span>]
+</span><span>                    </span><span style=color:#8e908c># то просто записываем результат на его выход
+</span><span>                    </span><span style=color:#c82728>self</span><span>.output[wire] </span><span style=color:#3e999f>= </span><span>result
+</span></code></pre><h1 id=realizatsiia-summatora>Реализация сумматора</h1><p>Если мы честно хотим реализовать сумматор используя класс <code>Element</code>, то для начала нам нужно создать ещё несколько логических элементов.<p>Реализовывать мы его будем через два полусумматора, а также нам будут нужны ещё и следующие элементы:<ul><li><code>NOT</code><li><code>AND</code><li><code>OR</code><li><code>XOR</code></ul><h2 id=element-not>Элемент NOT</h2><p>Элемент <code>NOT</code> достаточно легко будет реализовать, нужно всего лишь подать один и тот же сигнал на обе ноги <code>NAND</code>.<pre style=color:#111;background-color:#f9f9f9><code><span>NOT X = X NAND X = NOT (X AND X) = NOT X
+</span></code></pre><p>Реализуем в коде<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8e908c># нам нужен новый объект, а не ссылка
+</span><span style=color:#8959a8>from </span><span>copy </span><span style=color:#8959a8>import </span><span>deepcopy
+</span><span>
+</span><span style=color:#8e908c>""" ... код ... """
+</span><span>
+</span><span style=color:#8e908c># создадим элемент NAND (два входа и один выход)
+</span><span>nand_e </span><span style=color:#3e999f>= </span><span style=color:#c82728>Element</span><span style=color:#4271ae>(</span><span style=color:#f07219>2</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>, </span><span style=color:#f07219>type</span><span style=color:#3e999f>=</span><span style=color:#839c00>'NAND'</span><span style=color:#4271ae>)
+</span><span style=color:#8e908c># создадим элемент NOT (вход и выход)
+</span><span>not_e </span><span style=color:#3e999f>= </span><span style=color:#c82728>Element</span><span style=color:#4271ae>(</span><span style=color:#f07219>1</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>)
+</span><span style=color:#8e908c># добавим элемент внутрь и получим его id
+</span><span>nand_id </span><span style=color:#3e999f>= </span><span style=color:#4271ae>not_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(nand_e))
+</span><span>
+</span><span style=color:#8e908c># соединяем нулевой вход элемента NOT и нулевой вход у NAND
+</span><span style=color:#4271ae>not_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># соединяем нулевой вход элемента NOT и первый вход у NAND
+</span><span style=color:#4271ae>not_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># соединяем выходы
+</span><span style=color:#4271ae>not_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, nand_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'out_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span>
+</span><span style=color:#8e908c># + можно сделать проверку на корректность результатов
+</span><span>not_e.input[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>= </span><span style=color:#f07219>0
+</span><span style=color:#4271ae>not_e.</span><span style=color:#c82728>execute</span><span style=color:#4271ae>()
+</span><span style=color:#8959a8>assert</span><span>(not_e.output[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span style=color:#f07219>1</span><span>)
+</span><span>not_e.input[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>= </span><span style=color:#f07219>1
+</span><span style=color:#4271ae>not_e.</span><span style=color:#c82728>execute</span><span style=color:#4271ae>()
+</span><span style=color:#8959a8>assert</span><span>(not_e.output[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span style=color:#f07219>0</span><span>)
+</span></code></pre><h2 id=element-and>Элемент AND</h2><p>Элемент <code>AND</code> реализуем через только что написанный <code>NOT</code> и опять же <code>NAND</code>.<pre style=color:#111;background-color:#f9f9f9><code><span>X AND Y = NOT (X NAND Y) = X AND Y
+</span></code></pre><p>Пишем код<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>from </span><span>itertools </span><span style=color:#8959a8>import </span><span>product
+</span><span>
+</span><span style=color:#8e908c>""" ... код ... """
+</span><span>
+</span><span style=color:#8e908c># создадим элемент AND (два входа и один выход)
+</span><span>and_e </span><span style=color:#3e999f>= </span><span style=color:#c82728>Element</span><span style=color:#4271ae>(</span><span style=color:#f07219>2</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>)
+</span><span style=color:#8e908c># добавим NOT и NAND
+</span><span>not_id_1 </span><span style=color:#3e999f>= </span><span style=color:#4271ae>and_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(not_e))
+</span><span>nand_id_1 </span><span style=color:#3e999f>= </span><span style=color:#4271ae>and_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(nand_e))
+</span><span>
+</span><span style=color:#8e908c># теперь соединяем провода
+</span><span style=color:#8e908c># B = X NAND Y
+</span><span style=color:#4271ae>and_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id_1, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>and_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id_1, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># A = NOT B
+</span><span style=color:#4271ae>and_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, nand_id_1, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, not_id_1, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># result = A
+</span><span style=color:#4271ae>and_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, not_id_1, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'out_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span>
+</span><span style=color:#8e908c># и делаем проверку
+</span><span style=color:#8959a8>for </span><span>signal </span><span style=color:#8959a8>in </span><span style=color:#c82728>product</span><span style=color:#4271ae>(range(</span><span style=color:#f07219>2</span><span style=color:#4271ae>), </span><span style=color:#f07219>repeat</span><span style=color:#3e999f>=</span><span style=color:#f07219>2</span><span style=color:#4271ae>)</span><span>:
+</span><span>    and_e.input </span><span style=color:#3e999f>= </span><span style=color:#c99e00>list</span><span style=color:#4271ae>(signal)
+</span><span>    </span><span style=color:#4271ae>and_e.</span><span style=color:#c82728>execute</span><span style=color:#4271ae>()
+</span><span>    prof </span><span style=color:#3e999f>= </span><span>signal[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>and </span><span>signal[</span><span style=color:#f07219>1</span><span>]
+</span><span>    </span><span style=color:#8959a8>assert</span><span>(and_e.output[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span>prof)
+</span></code></pre><h2 id=element-or>Элемент OR</h2><p>Элемент <code>OR</code> реализуем используя три <code>NAND</code>.<pre style=color:#111;background-color:#f9f9f9><code><span>X OR Y = (X NAND X) NAND (Y NAND Y)
+</span></code></pre><p>Реализуя следующим кодом<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8e908c># создаём элемент OR (два входа и один выход)
+</span><span>or_e </span><span style=color:#3e999f>= </span><span style=color:#c82728>Element</span><span style=color:#4271ae>(</span><span style=color:#f07219>2</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>)
+</span><span style=color:#8e908c># добавляем нужные элементы
+</span><span>nand_id_1 </span><span style=color:#3e999f>= </span><span style=color:#4271ae>or_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(nand_e))
+</span><span>nand_id_2 </span><span style=color:#3e999f>= </span><span style=color:#4271ae>or_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(nand_e))
+</span><span>nand_id_3 </span><span style=color:#3e999f>= </span><span style=color:#4271ae>or_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(nand_e))
+</span><span>
+</span><span style=color:#8e908c># и соединяем провода
+</span><span style=color:#8e908c># A = X NAND X
+</span><span style=color:#4271ae>or_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id_1, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>or_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id_1, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># B = Y NAND Y
+</span><span style=color:#4271ae>or_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id_2, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>or_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id_2, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># C = A NAND B
+</span><span style=color:#4271ae>or_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, nand_id_1, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id_3, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>or_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, nand_id_2, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id_3, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># result = C
+</span><span style=color:#4271ae>or_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, nand_id_3, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'out_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span>
+</span><span style=color:#8e908c># и делаем проверку
+</span><span style=color:#8959a8>for </span><span>signal </span><span style=color:#8959a8>in </span><span style=color:#c82728>product</span><span style=color:#4271ae>(range(</span><span style=color:#f07219>2</span><span style=color:#4271ae>), </span><span style=color:#f07219>repeat</span><span style=color:#3e999f>=</span><span style=color:#f07219>2</span><span style=color:#4271ae>)</span><span>:
+</span><span>    or_e.input </span><span style=color:#3e999f>= </span><span style=color:#c99e00>list</span><span style=color:#4271ae>(signal)
+</span><span>    </span><span style=color:#4271ae>or_e.</span><span style=color:#c82728>execute</span><span style=color:#4271ae>()
+</span><span>    prof </span><span style=color:#3e999f>= </span><span>signal[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>or </span><span>signal[</span><span style=color:#f07219>1</span><span>]
+</span><span>    </span><span style=color:#8959a8>assert</span><span>(or_e.output[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span>prof)
+</span></code></pre><h2 id=element-xor>Элемент XOR</h2><p>Элемент <code>XOR</code> реализуем используя <code>NAND</code>, <code>AND</code> и <code>OR</code>.<pre style=color:#111;background-color:#f9f9f9><code><span>X XOR Y = (X NAND Y) AND (X OR Y)
+</span></code></pre><p>Реализация будет следующая<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8e908c># создаем элемент XOR (два входа и один выход)
+</span><span>xor_e </span><span style=color:#3e999f>= </span><span style=color:#c82728>Element</span><span style=color:#4271ae>(</span><span style=color:#f07219>2</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>)
+</span><span style=color:#8e908c># добавляем элементы
+</span><span>nand_id </span><span style=color:#3e999f>= </span><span style=color:#4271ae>xor_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(nand_e))
+</span><span>or_id </span><span style=color:#3e999f>= </span><span style=color:#4271ae>xor_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(or_e))
+</span><span>and_id </span><span style=color:#3e999f>= </span><span style=color:#4271ae>xor_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(and_e))
+</span><span>
+</span><span style=color:#8e908c># и соединяем провода
+</span><span style=color:#8e908c># A = X NAND Y
+</span><span style=color:#4271ae>xor_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>xor_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># B = X OR Y
+</span><span style=color:#4271ae>xor_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, or_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>xor_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, or_id, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># C = A AND B
+</span><span style=color:#4271ae>xor_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, nand_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, and_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>xor_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, or_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, and_id, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># result = C
+</span><span style=color:#4271ae>xor_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, and_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'out_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span>
+</span><span style=color:#8e908c># и делаем проверку
+</span><span style=color:#8959a8>for </span><span>signal </span><span style=color:#8959a8>in </span><span style=color:#c82728>product</span><span style=color:#4271ae>(range(</span><span style=color:#f07219>2</span><span style=color:#4271ae>), </span><span style=color:#f07219>repeat</span><span style=color:#3e999f>=</span><span style=color:#f07219>2</span><span style=color:#4271ae>)</span><span>:
+</span><span>    xor_e.input </span><span style=color:#3e999f>= </span><span style=color:#c99e00>list</span><span style=color:#4271ae>(signal)
+</span><span>    </span><span style=color:#4271ae>xor_e.</span><span style=color:#c82728>execute</span><span style=color:#4271ae>()
+</span><span>    prof </span><span style=color:#3e999f>= </span><span>signal[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>^ </span><span>signal[</span><span style=color:#f07219>1</span><span>]
+</span><span>    </span><span style=color:#8959a8>assert</span><span>(xor_e.output[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span>prof)
+</span></code></pre><h2 id=polusummator>Полусумматор</h2><p>Настало время написать полусумматор. Для этого нам понадобятся два элемента: <code>XOR</code> и <code>AND</code>.<p>Таблица истинности полусумматора выглядит следующим образом<table><thead><tr><th style=text-align:center>X<th style=text-align:center>Y<th style=text-align:center>S<th style=text-align:center>C<tbody><tr><td style=text-align:center>0<td style=text-align:center>0<td style=text-align:center>0<td style=text-align:center>0<tr><td style=text-align:center>0<td style=text-align:center>1<td style=text-align:center>1<td style=text-align:center>0<tr><td style=text-align:center>1<td style=text-align:center>0<td style=text-align:center>1<td style=text-align:center>0<tr><td style=text-align:center>1<td style=text-align:center>1<td style=text-align:center>0<td style=text-align:center>1</table><p>где <code>X</code> и <code>Y</code> — входы, а <code>S</code> и <code>C</code> — сумма и бит переноса, и они определяются следующими выражениями<pre style=color:#111;background-color:#f9f9f9><code><span>S = X XOR Y
+</span><span>C = X AND Y
+</span></code></pre><p>Напишем его реализацию<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8e908c># создаём полусумматор (два входа и два выхода)
+</span><span>hadd_e </span><span style=color:#3e999f>= </span><span style=color:#c82728>Element</span><span style=color:#4271ae>(</span><span style=color:#f07219>2</span><span style=color:#4271ae>, </span><span style=color:#f07219>2</span><span style=color:#4271ae>)
+</span><span style=color:#8e908c># добавляем в него XOR и AND
+</span><span>xor_id </span><span style=color:#3e999f>= </span><span style=color:#4271ae>hadd_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(xor_e))
+</span><span>and_id </span><span style=color:#3e999f>= </span><span style=color:#4271ae>hadd_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(and_e))
+</span><span>
+</span><span style=color:#8e908c># и соединяем провода
+</span><span style=color:#8e908c># S = X XOR Y
+</span><span style=color:#4271ae>hadd_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, xor_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>hadd_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, xor_id, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># result[0] = S
+</span><span style=color:#4271ae>hadd_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, xor_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'out_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># C = X AND Y
+</span><span style=color:#4271ae>hadd_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, and_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>hadd_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, and_id, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># result[1] = C
+</span><span style=color:#4271ae>hadd_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, and_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'out_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span>
+</span><span style=color:#8e908c># и делаем проверку
+</span><span style=color:#8959a8>for </span><span>signal </span><span style=color:#8959a8>in </span><span style=color:#c82728>product</span><span style=color:#4271ae>(range(</span><span style=color:#f07219>2</span><span style=color:#4271ae>), </span><span style=color:#f07219>repeat</span><span style=color:#3e999f>=</span><span style=color:#f07219>2</span><span style=color:#4271ae>)</span><span>:
+</span><span>    hadd_e.input </span><span style=color:#3e999f>= </span><span style=color:#c99e00>list</span><span style=color:#4271ae>(signal)
+</span><span>    </span><span style=color:#4271ae>hadd_e.</span><span style=color:#c82728>execute</span><span style=color:#4271ae>()
+</span><span>    prof </span><span style=color:#3e999f>= </span><span>[signal[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>^ </span><span>signal[</span><span style=color:#f07219>1</span><span>], signal[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>and </span><span>signal[</span><span style=color:#f07219>1</span><span>]]
+</span><span>    </span><span style=color:#8959a8>assert</span><span>(hadd_e.output </span><span style=color:#3e999f>== </span><span>prof)
+</span></code></pre><h2 id=summator>Сумматор</h2><p>Наконец-то мы подошли к самому сумматору!<p>Для его реализации нам понадобятся два полусумматора и элемент <code>OR</code>.<p>Таблица истинности следующая<table><thead><tr><th style=text-align:center>X<th style=text-align:center>Y<th style=text-align:center>Z<th style=text-align:center>S<th style=text-align:center>C<tbody><tr><td style=text-align:center>0<td style=text-align:center>0<td style=text-align:center>0<td style=text-align:center>0<td style=text-align:center>0<tr><td style=text-align:center>1<td style=text-align:center>0<td style=text-align:center>0<td style=text-align:center>1<td style=text-align:center>0<tr><td style=text-align:center>0<td style=text-align:center>1<td style=text-align:center>0<td style=text-align:center>1<td style=text-align:center>0<tr><td style=text-align:center>1<td style=text-align:center>1<td style=text-align:center>0<td style=text-align:center>0<td style=text-align:center>1<tr><td style=text-align:center>0<td style=text-align:center>0<td style=text-align:center>1<td style=text-align:center>1<td style=text-align:center>0<tr><td style=text-align:center>1<td style=text-align:center>0<td style=text-align:center>1<td style=text-align:center>0<td style=text-align:center>1<tr><td style=text-align:center>0<td style=text-align:center>1<td style=text-align:center>1<td style=text-align:center>0<td style=text-align:center>1<tr><td style=text-align:center>1<td style=text-align:center>1<td style=text-align:center>1<td style=text-align:center>1<td style=text-align:center>1</table><p>где <code>X</code> и <code>Y</code> — входы, <code>Z</code> — входной бит переноса, <code>S</code> — выходная сумма, <code>C</code> — выходной бит переноса.<p>Давайте же наконец напишем его<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8e908c># создаём сумматор (три входа и два выхода)
+</span><span>add_e </span><span style=color:#3e999f>= </span><span style=color:#c82728>Element</span><span style=color:#4271ae>(</span><span style=color:#f07219>3</span><span style=color:#4271ae>, </span><span style=color:#f07219>2</span><span style=color:#4271ae>)
+</span><span style=color:#8e908c># добавляем элементы
+</span><span>ha_id_1 </span><span style=color:#3e999f>= </span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(hadd_e))
+</span><span>ha_id_2 </span><span style=color:#3e999f>= </span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(hadd_e))
+</span><span>or_id </span><span style=color:#3e999f>= </span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(or_e))
+</span><span>
+</span><span style=color:#8e908c># и соединяем провода
+</span><span style=color:#8e908c># я думаю вы сможете найти схему полного сумматора на двух полусумматорах
+</span><span style=color:#8e908c># и разобраться в этом коде!
+</span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, ha_id_1, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, ha_id_1, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>2</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, ha_id_2, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, ha_id_1, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, ha_id_2, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, ha_id_1, </span><span style=color:#f07219>1</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, or_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, ha_id_2, </span><span style=color:#f07219>1</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, or_id, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, ha_id_2, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'out_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, or_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'out_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span>
+</span><span style=color:#8e908c># делаем финальную проверку по таблице истинности
+</span><span>table </span><span style=color:#3e999f>= </span><span>[
+</span><span style=color:#8e908c>#    X  Y  Z  S  C
+</span><span>    [</span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>0</span><span>],
+</span><span>    [</span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>0</span><span>],
+</span><span>    [</span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>0</span><span>],
+</span><span>    [</span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>1</span><span>],
+</span><span>    [</span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>0</span><span>],
+</span><span>    [</span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>1</span><span>],
+</span><span>    [</span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>1</span><span>],
+</span><span>    [</span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>1</span><span>]
+</span><span>]
+</span><span style=color:#8959a8>for </span><span>x, y, z, s, c </span><span style=color:#8959a8>in </span><span>table:
+</span><span>    add_e.input </span><span style=color:#3e999f>= </span><span>[x, y, z]
+</span><span>    </span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>execute</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8959a8>assert</span><span>(add_e.output </span><span style=color:#3e999f>== </span><span>[s, c])
+</span></code></pre><p>Полный листинг представлен ниже<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>from </span><span>itertools </span><span style=color:#8959a8>import </span><span>product
+</span><span style=color:#8959a8>from </span><span>copy </span><span style=color:#8959a8>import </span><span>deepcopy
+</span><span>
+</span><span>
+</span><span style=color:#8959a8>class </span><span style=color:#c99e00>Element</span><span>:
+</span><span>    </span><span style=color:#8e908c>"""
+</span><span style=color:#8e908c>        input_w  -- количество входных проводов
+</span><span style=color:#8e908c>        output_w -- количество выходных проводов
+</span><span style=color:#8e908c>        type     -- тип элемента ('составной' или 'NAND')
+</span><span style=color:#8e908c>    """
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>__init__</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>input_w</span><span>, </span><span style=color:#f07219>output_w</span><span>, </span><span style=color:#f07219>type</span><span style=color:#3e999f>=</span><span style=color:#839c00>'составной'</span><span>):
+</span><span>        </span><span style=color:#8e908c># инициализируем нулями массивы входов и выходов
+</span><span>        </span><span style=color:#c82728>self</span><span>.input </span><span style=color:#3e999f>= </span><span>[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>* </span><span>input_w
+</span><span>        </span><span style=color:#c82728>self</span><span>.output </span><span style=color:#3e999f>= </span><span>[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>* </span><span>output_w
+</span><span>        </span><span style=color:#8e908c># указываем тип элемента
+</span><span>        </span><span style=color:#c82728>self</span><span>.type </span><span style=color:#3e999f>= </span><span style=color:#4271ae>type
+</span><span>        </span><span style=color:#8e908c># создаём список для внутренних элементов
+</span><span>        </span><span style=color:#c82728>self</span><span>.elements </span><span style=color:#3e999f>= </span><span>[]
+</span><span>        </span><span style=color:#8e908c># создаём список соединяющих проводов
+</span><span>        </span><span style=color:#c82728>self</span><span>.wires </span><span style=color:#3e999f>= </span><span>[]
+</span><span>
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>push_element</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>element</span><span>):
+</span><span>        </span><span style=color:#8e908c># проталкиваем элемент в список
+</span><span>        </span><span style=color:#c82728>self</span><span style=color:#4271ae>.elements.</span><span style=color:#c82728>append</span><span style=color:#4271ae>(element)
+</span><span>        </span><span style=color:#8e908c># и возвращаем его номер в списке
+</span><span>        </span><span style=color:#8959a8>return </span><span style=color:#4271ae>len(</span><span style=color:#c82728>self</span><span style=color:#4271ae>.elements) </span><span style=color:#3e999f>- </span><span style=color:#f07219>1
+</span><span>
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>connect_wire</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>wire_a</span><span>, </span><span style=color:#f07219>wire_b</span><span>):
+</span><span>        </span><span style=color:#8e908c># добавляем провод в список
+</span><span>        </span><span style=color:#c82728>self</span><span style=color:#4271ae>.wires.</span><span style=color:#c82728>append</span><span style=color:#4271ae>((wire_a, wire_b))
+</span><span>
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>execute</span><span>(</span><span style=color:#f07219>self</span><span>):
+</span><span>        </span><span style=color:#8e908c># если элемент NAND, то считаем по формуле
+</span><span>        </span><span style=color:#8959a8>if </span><span style=color:#c82728>self</span><span>.type </span><span style=color:#3e999f>== </span><span style=color:#839c00>'NAND'</span><span>:
+</span><span>            </span><span style=color:#8e908c># X NAND Y = NOT (X AND Y) = (NOT X) or (NOT Y)
+</span><span>            </span><span style=color:#8e908c># см. законы де Моргана
+</span><span>            </span><span style=color:#c82728>self</span><span>.output[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>= </span><span>(</span><span style=color:#3e999f>not </span><span style=color:#c82728>self</span><span>.input[</span><span style=color:#f07219>0</span><span>]) </span><span style=color:#3e999f>% </span><span style=color:#f07219>2 </span><span style=color:#3e999f>or </span><span>(</span><span style=color:#3e999f>not </span><span style=color:#c82728>self</span><span>.input[</span><span style=color:#f07219>1</span><span>]) </span><span style=color:#3e999f>% </span><span style=color:#f07219>2
+</span><span>            </span><span style=color:#8e908c># и выбирай любое из условий :)
+</span><span>            </span><span style=color:#8e908c># self.output[0] = (not (self.input[0] and self.input[1])) % 2
+</span><span>        </span><span style=color:#8e908c># иначе, если элемент составной:
+</span><span>        </span><span style=color:#8959a8>elif </span><span style=color:#c82728>self</span><span>.type </span><span style=color:#3e999f>== </span><span style=color:#839c00>'составной'</span><span>:
+</span><span>            </span><span style=color:#8e908c>"""
+</span><span style=color:#8e908c>            идём по всем проводам, где
+</span><span style=color:#8e908c>                from_e -- начало провода
+</span><span style=color:#8e908c>                  to_e -- конец провода
+</span><span style=color:#8e908c>            """
+</span><span>            </span><span style=color:#8959a8>for </span><span>from_e, to_e </span><span style=color:#8959a8>in </span><span style=color:#c82728>self</span><span>.wires:
+</span><span>                </span><span style=color:#8e908c># если from_e -- вход у элемента
+</span><span>                </span><span style=color:#8959a8>if </span><span>from_e[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span style=color:#839c00>'in_self'</span><span>:
+</span><span>                    wire </span><span style=color:#3e999f>= </span><span>from_e[</span><span style=color:#f07219>1</span><span>]
+</span><span>                    </span><span style=color:#8e908c># запоминаем установленных вход во временную переменную
+</span><span>                    result </span><span style=color:#3e999f>= </span><span style=color:#c82728>self</span><span>.input[wire]
+</span><span>                </span><span style=color:#8e908c># если from_e -- выход у внутреннего элемента
+</span><span>                </span><span style=color:#8959a8>elif </span><span>from_e[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span style=color:#839c00>'out'</span><span>:
+</span><span>                    </span><span style=color:#8e908c># вытаскиваем номер элемента и провод из from_e
+</span><span>                    idN, wire </span><span style=color:#3e999f>= </span><span>from_e[</span><span style=color:#f07219>1</span><span>:]
+</span><span>                    </span><span style=color:#8e908c># и запоминаем установленных выход во временную переменную
+</span><span>                    result </span><span style=color:#3e999f>= </span><span style=color:#c82728>self</span><span>.elements[idN].output[wire]
+</span><span>                </span><span style=color:#8e908c># если to_e -- вход внутреннего элемента
+</span><span>                </span><span style=color:#8959a8>if </span><span>to_e[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span style=color:#839c00>'in'</span><span>:
+</span><span>                    </span><span style=color:#8e908c># вытаскиваем номер элемента и провод
+</span><span>                    idN, wire </span><span style=color:#3e999f>= </span><span>to_e[</span><span style=color:#f07219>1</span><span>:]
+</span><span>                    </span><span style=color:#8e908c># устанавливаем значение сигнала на проводе используя ту самую переменную
+</span><span>                    </span><span style=color:#c82728>self</span><span>.elements[idN].input[wire] </span><span style=color:#3e999f>= </span><span>result
+</span><span>                    </span><span style=color:#8e908c># и выполняем код внутри элемента
+</span><span>                    </span><span style=color:#c82728>self</span><span>.elements[idN]</span><span style=color:#4271ae>.</span><span style=color:#c82728>execute</span><span style=color:#4271ae>()
+</span><span>                </span><span style=color:#8e908c># если to_e -- выход у самого элемента
+</span><span>                </span><span style=color:#8959a8>elif </span><span>to_e[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span style=color:#839c00>'out_self'</span><span>:
+</span><span>                    wire </span><span style=color:#3e999f>= </span><span>to_e[</span><span style=color:#f07219>1</span><span>]
+</span><span>                    </span><span style=color:#8e908c># то просто записываем результат на его выход
+</span><span>                    </span><span style=color:#c82728>self</span><span>.output[wire] </span><span style=color:#3e999f>= </span><span>result
+</span><span>
+</span><span>
+</span><span style=color:#8e908c>""" Реализация NOT """
+</span><span>
+</span><span style=color:#8e908c># создадим элемент NAND (два входа и один выход)
+</span><span>nand_e </span><span style=color:#3e999f>= </span><span style=color:#c82728>Element</span><span style=color:#4271ae>(</span><span style=color:#f07219>2</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>, </span><span style=color:#f07219>type</span><span style=color:#3e999f>=</span><span style=color:#839c00>'NAND'</span><span style=color:#4271ae>)
+</span><span style=color:#8e908c># создадим элемент NOT (вход и выход)
+</span><span>not_e </span><span style=color:#3e999f>= </span><span style=color:#c82728>Element</span><span style=color:#4271ae>(</span><span style=color:#f07219>1</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>)
+</span><span style=color:#8e908c># добавим элемент внутрь и получим его id
+</span><span>nand_id </span><span style=color:#3e999f>= </span><span style=color:#4271ae>not_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(nand_e))
+</span><span>
+</span><span style=color:#8e908c># соединяем нулевой вход элемента NOT и нулевой вход у NAND
+</span><span style=color:#4271ae>not_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># соединяем нулевой вход элемента NOT и первый вход у NAND
+</span><span style=color:#4271ae>not_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># соединяем выходы
+</span><span style=color:#4271ae>not_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, nand_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'out_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span>
+</span><span style=color:#8e908c># + можно сделать проверку на корректность результатов
+</span><span>not_e.input[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>= </span><span style=color:#f07219>0
+</span><span style=color:#4271ae>not_e.</span><span style=color:#c82728>execute</span><span style=color:#4271ae>()
+</span><span style=color:#8959a8>assert</span><span>(not_e.output[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span style=color:#f07219>1</span><span>)
+</span><span>not_e.input[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>= </span><span style=color:#f07219>1
+</span><span style=color:#4271ae>not_e.</span><span style=color:#c82728>execute</span><span style=color:#4271ae>()
+</span><span style=color:#8959a8>assert</span><span>(not_e.output[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span style=color:#f07219>0</span><span>)
+</span><span>
+</span><span style=color:#8e908c>""" Реализация AND """
+</span><span>
+</span><span style=color:#8e908c># создадим элемент AND (два входа и один выход)
+</span><span>and_e </span><span style=color:#3e999f>= </span><span style=color:#c82728>Element</span><span style=color:#4271ae>(</span><span style=color:#f07219>2</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>)
+</span><span style=color:#8e908c># добавим NOT и NAND
+</span><span>not_id </span><span style=color:#3e999f>= </span><span style=color:#4271ae>and_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(not_e))
+</span><span>nand_id </span><span style=color:#3e999f>= </span><span style=color:#4271ae>and_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(nand_e))
+</span><span>
+</span><span style=color:#8e908c># теперь соединяем провода
+</span><span style=color:#8e908c># B = X NAND Y
+</span><span style=color:#4271ae>and_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>and_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># A = NOT B
+</span><span style=color:#4271ae>and_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, nand_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, not_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># result = A
+</span><span style=color:#4271ae>and_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, not_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'out_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span>
+</span><span style=color:#8e908c># и делаем проверку
+</span><span style=color:#8959a8>for </span><span>signal </span><span style=color:#8959a8>in </span><span style=color:#c82728>product</span><span style=color:#4271ae>(range(</span><span style=color:#f07219>2</span><span style=color:#4271ae>), </span><span style=color:#f07219>repeat</span><span style=color:#3e999f>=</span><span style=color:#f07219>2</span><span style=color:#4271ae>)</span><span>:
+</span><span>    and_e.input </span><span style=color:#3e999f>= </span><span style=color:#c99e00>list</span><span style=color:#4271ae>(signal)
+</span><span>    </span><span style=color:#4271ae>and_e.</span><span style=color:#c82728>execute</span><span style=color:#4271ae>()
+</span><span>    prof </span><span style=color:#3e999f>= </span><span>signal[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>and </span><span>signal[</span><span style=color:#f07219>1</span><span>]
+</span><span>    </span><span style=color:#8959a8>assert</span><span>(and_e.output[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span>prof)
+</span><span>
+</span><span style=color:#8e908c>""" Реализация OR """
+</span><span>
+</span><span style=color:#8e908c># создаём элемент OR (два входа и один выход)
+</span><span>or_e </span><span style=color:#3e999f>= </span><span style=color:#c82728>Element</span><span style=color:#4271ae>(</span><span style=color:#f07219>2</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>)
+</span><span style=color:#8e908c># добавляем нужные элементы
+</span><span>nand_id_1 </span><span style=color:#3e999f>= </span><span style=color:#4271ae>or_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(nand_e))
+</span><span>nand_id_2 </span><span style=color:#3e999f>= </span><span style=color:#4271ae>or_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(nand_e))
+</span><span>nand_id_3 </span><span style=color:#3e999f>= </span><span style=color:#4271ae>or_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(nand_e))
+</span><span>
+</span><span style=color:#8e908c># и соединяем провода
+</span><span style=color:#8e908c># A = X NAND X
+</span><span style=color:#4271ae>or_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id_1, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>or_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id_1, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># B = Y NAND Y
+</span><span style=color:#4271ae>or_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id_2, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>or_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id_2, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># C = A NAND B
+</span><span style=color:#4271ae>or_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, nand_id_1, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id_3, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>or_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, nand_id_2, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id_3, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># result = C
+</span><span style=color:#4271ae>or_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, nand_id_3, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'out_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span>
+</span><span style=color:#8e908c># и делаем проверку
+</span><span style=color:#8959a8>for </span><span>signal </span><span style=color:#8959a8>in </span><span style=color:#c82728>product</span><span style=color:#4271ae>(range(</span><span style=color:#f07219>2</span><span style=color:#4271ae>), </span><span style=color:#f07219>repeat</span><span style=color:#3e999f>=</span><span style=color:#f07219>2</span><span style=color:#4271ae>)</span><span>:
+</span><span>    or_e.input </span><span style=color:#3e999f>= </span><span style=color:#c99e00>list</span><span style=color:#4271ae>(signal)
+</span><span>    </span><span style=color:#4271ae>or_e.</span><span style=color:#c82728>execute</span><span style=color:#4271ae>()
+</span><span>    prof </span><span style=color:#3e999f>= </span><span>signal[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>or </span><span>signal[</span><span style=color:#f07219>1</span><span>]
+</span><span>    </span><span style=color:#8959a8>assert</span><span>(or_e.output[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span>prof)
+</span><span>
+</span><span style=color:#8e908c>""" Реализация XOR """
+</span><span style=color:#8e908c># создаем элемент XOR (два входа и один выход)
+</span><span>xor_e </span><span style=color:#3e999f>= </span><span style=color:#c82728>Element</span><span style=color:#4271ae>(</span><span style=color:#f07219>2</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>)
+</span><span style=color:#8e908c># добавляем элементы
+</span><span>nand_id </span><span style=color:#3e999f>= </span><span style=color:#4271ae>xor_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(nand_e))
+</span><span>or_id </span><span style=color:#3e999f>= </span><span style=color:#4271ae>xor_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(or_e))
+</span><span>and_id </span><span style=color:#3e999f>= </span><span style=color:#4271ae>xor_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(and_e))
+</span><span>
+</span><span style=color:#8e908c># и соединяем провода
+</span><span style=color:#8e908c># A = X NAND Y
+</span><span style=color:#4271ae>xor_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>xor_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, nand_id, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># B = X OR Y
+</span><span style=color:#4271ae>xor_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, or_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>xor_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, or_id, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># C = A AND B
+</span><span style=color:#4271ae>xor_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, nand_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, and_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>xor_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, or_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, and_id, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># result = C
+</span><span style=color:#4271ae>xor_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, and_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'out_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span>
+</span><span style=color:#8e908c># и делаем проверку
+</span><span style=color:#8959a8>for </span><span>signal </span><span style=color:#8959a8>in </span><span style=color:#c82728>product</span><span style=color:#4271ae>(range(</span><span style=color:#f07219>2</span><span style=color:#4271ae>), </span><span style=color:#f07219>repeat</span><span style=color:#3e999f>=</span><span style=color:#f07219>2</span><span style=color:#4271ae>)</span><span>:
+</span><span>    xor_e.input </span><span style=color:#3e999f>= </span><span style=color:#c99e00>list</span><span style=color:#4271ae>(signal)
+</span><span>    </span><span style=color:#4271ae>xor_e.</span><span style=color:#c82728>execute</span><span style=color:#4271ae>()
+</span><span>    prof </span><span style=color:#3e999f>= </span><span>signal[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>^ </span><span>signal[</span><span style=color:#f07219>1</span><span>]
+</span><span>    </span><span style=color:#8959a8>assert</span><span>(xor_e.output[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span>prof)
+</span><span>
+</span><span style=color:#8e908c>""" Реализация HADD """
+</span><span style=color:#8e908c># создаём полусумматор (два входа и два выхода)
+</span><span>hadd_e </span><span style=color:#3e999f>= </span><span style=color:#c82728>Element</span><span style=color:#4271ae>(</span><span style=color:#f07219>2</span><span style=color:#4271ae>, </span><span style=color:#f07219>2</span><span style=color:#4271ae>)
+</span><span style=color:#8e908c># добавляем в него XOR и AND
+</span><span>xor_id </span><span style=color:#3e999f>= </span><span style=color:#4271ae>hadd_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(xor_e))
+</span><span>and_id </span><span style=color:#3e999f>= </span><span style=color:#4271ae>hadd_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(and_e))
+</span><span>
+</span><span style=color:#8e908c># и соединяем провода
+</span><span style=color:#8e908c># S = X XOR Y
+</span><span style=color:#4271ae>hadd_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, xor_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>hadd_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, xor_id, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># result[0] = S
+</span><span style=color:#4271ae>hadd_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, xor_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'out_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># C = X AND Y
+</span><span style=color:#4271ae>hadd_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, and_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>hadd_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, and_id, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#8e908c># result[1] = C
+</span><span style=color:#4271ae>hadd_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, and_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'out_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span>
+</span><span style=color:#8e908c># и делаем проверку
+</span><span style=color:#8959a8>for </span><span>signal </span><span style=color:#8959a8>in </span><span style=color:#c82728>product</span><span style=color:#4271ae>(range(</span><span style=color:#f07219>2</span><span style=color:#4271ae>), </span><span style=color:#f07219>repeat</span><span style=color:#3e999f>=</span><span style=color:#f07219>2</span><span style=color:#4271ae>)</span><span>:
+</span><span>    hadd_e.input </span><span style=color:#3e999f>= </span><span style=color:#c99e00>list</span><span style=color:#4271ae>(signal)
+</span><span>    </span><span style=color:#4271ae>hadd_e.</span><span style=color:#c82728>execute</span><span style=color:#4271ae>()
+</span><span>    prof </span><span style=color:#3e999f>= </span><span>[signal[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>^ </span><span>signal[</span><span style=color:#f07219>1</span><span>], signal[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>and </span><span>signal[</span><span style=color:#f07219>1</span><span>]]
+</span><span>    </span><span style=color:#8959a8>assert</span><span>(hadd_e.output </span><span style=color:#3e999f>== </span><span>prof)
+</span><span>
+</span><span style=color:#8e908c>""" Сумматор """
+</span><span style=color:#8e908c># создаём сумматор (три входа и два выхода)
+</span><span>add_e </span><span style=color:#3e999f>= </span><span style=color:#c82728>Element</span><span style=color:#4271ae>(</span><span style=color:#f07219>3</span><span style=color:#4271ae>, </span><span style=color:#f07219>2</span><span style=color:#4271ae>)
+</span><span style=color:#8e908c># добавляем элементы
+</span><span>ha_id_1 </span><span style=color:#3e999f>= </span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(hadd_e))
+</span><span>ha_id_2 </span><span style=color:#3e999f>= </span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(hadd_e))
+</span><span>or_id </span><span style=color:#3e999f>= </span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>push_element</span><span style=color:#4271ae>(</span><span style=color:#c82728>deepcopy</span><span style=color:#4271ae>(or_e))
+</span><span>
+</span><span style=color:#8e908c># и соединяем провода
+</span><span style=color:#8e908c># я думаю вы сможете найти схему полного сумматора на двух полусумматорах
+</span><span style=color:#8e908c># и разобраться в этом коде!
+</span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, ha_id_1, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, ha_id_1, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'in_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>2</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, ha_id_2, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, ha_id_1, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, ha_id_2, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, ha_id_1, </span><span style=color:#f07219>1</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, or_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, ha_id_2, </span><span style=color:#f07219>1</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'in'</span><span style=color:#4271ae>, or_id, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, ha_id_2, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'out_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>connect_wire</span><span style=color:#4271ae>((</span><span style=color:#839c00>'out'</span><span style=color:#4271ae>, or_id, </span><span style=color:#f07219>0</span><span style=color:#4271ae>), (</span><span style=color:#839c00>'out_self'</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>))
+</span><span>
+</span><span style=color:#8e908c># делаем финальную проверку по таблице истинности
+</span><span>table </span><span style=color:#3e999f>= </span><span>[
+</span><span style=color:#8e908c>#    X  Y  Z  S  C
+</span><span>    [</span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>0</span><span>],
+</span><span>    [</span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>0</span><span>],
+</span><span>    [</span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>0</span><span>],
+</span><span>    [</span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>1</span><span>],
+</span><span>    [</span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>0</span><span>],
+</span><span>    [</span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>1</span><span>],
+</span><span>    [</span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>0</span><span>, </span><span style=color:#f07219>1</span><span>],
+</span><span>    [</span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>1</span><span>, </span><span style=color:#f07219>1</span><span>]
+</span><span>]
+</span><span style=color:#8959a8>for </span><span>x, y, z, s, c </span><span style=color:#8959a8>in </span><span>table:
+</span><span>    add_e.input </span><span style=color:#3e999f>= </span><span>[x, y, z]
+</span><span>    </span><span style=color:#4271ae>add_e.</span><span style=color:#c82728>execute</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8959a8>assert</span><span>(add_e.output </span><span style=color:#3e999f>== </span><span>[s, c])
+</span></code></pre><h1 id=posleslovie>Послесловие</h1><p>Что имеем в итоге:<ul><li>реализовали простой симулятор логики<li>реализовали простые элементы на базе <code>NAND</code>: <ul><li><code>NOT</code><li><code>AND</code><li><code>OR</code><li><code>XOR</code></ul><li>реализовали полусумматор и сумматор</ul><p>На этом сегодня всё!<h1 id=poleznye-ssylki>Полезные ссылки</h1><ol><li><a href=https://github.com/FreeCX/rs-logic>Симулятор с примерами на Rust</a><li><a href=https://ru.wikipedia.org>Wikipedia</a><li><a href=https://google.com>Google</a></ol></article><div class=back><a href=https://freecx.github.io/>Назад</a></div><div class=footer><span>Также читайте <a title="ты сам сломал ссылку, так что ничего личного" href=https://antoniii.github.io/> <s>antoniii</s> </a> <a href=https://citrux.github.io/>citrux</a> <a href=https://sputnikas.github.io/>sputnikas</a> </span></div><script>let msg=` А спонсор статей в моём блоге -- моя лень -- спонсор статей.`;[`=`.repeat(msg.length+ 1),msg,`=`.repeat(msg.length+ 1)].forEach(a=>console.warn(a))</script>

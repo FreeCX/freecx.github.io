@@ -1,0 +1,185 @@
+<!doctype html><html lang=ru><head><meta charset=utf-8><meta content="IE=edge" http-equiv=X-UA-Compatible><meta content="width=device-width,initial-scale=1" name=viewport><title>Имитируем git репозиторий</title><meta content="Кодерный понедельник" name=description><meta content=https://freecx.github.io/touch-icon.png property=og:image><link href=https://code.cdn.mozilla.net/fonts/fira.css rel=stylesheet><link href=https://freecx.github.io/favicon.png rel=icon><link href=https://freecx.github.io/touch-icon.png rel=apple-touch-icon><link href=https://freecx.github.io/main.css rel=stylesheet><link href=https://freecx.github.io/syntax.css rel=stylesheet><body><aside class=logo><a href=https://github.com/FreeCX> <img class=gravatar src=https://freecx.github.io/avatar.png> </a><span class=logo-prompt>Я на github</span></aside><article><div class=center><h1>Имитируем git репозиторий</h1><time>5 September 2020</time></div><div class=divider></div><p>Давайте сегодня сделаем кое-что интересно, а именно фейковый git репозиторий на python.<p>Сначала нужно разобрать немного теории, чтобы понять как работает git, хоть и в упрощенном виде.<p>На истину в последней инстанции не претендую. Лучше обратитесь к правильному описанию работы в книжке Pro Git или исходниках.<p>Погнали!<h1 id=nachinaem-kovyriat-rabotu-git>Начинаем ковырять работу git</h1><p>Если вы читали мою прошлую <a href=https://freecx.github.io/blog/2020/09/04/simple-git-server>статью</a> и проверяли работу, то могли увидеть какие запросы делает git, чтобы получить репозиторий.<p>Но если не читали или не делали, то вот вам оно<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/info/refs?service=git-upload-pack HTTP/1.1"</span><span style=color:#4271ae> 200 -
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/HEAD HTTP/1.1"</span><span style=color:#4271ae> 200 -
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>]</span><span style=color:#4271ae> code 404, message File not found
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/objects/e2/9a0f6430889930005e6d3494e905aee019d4b5 HTTP/1.1"</span><span style=color:#4271ae> 404 -
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>]</span><span style=color:#4271ae> code 404, message File not found
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/objects/4f/2682ed22e139c2ccebe11705ccd49bf0b90c0b HTTP/1.1"</span><span style=color:#4271ae> 404 -
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>]</span><span style=color:#4271ae> code 404, message File not found
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>]</span><span style=color:#4271ae> code 404, message File not found
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/objects/9b/7de41f6a27f7a3c7d3539ba4bc1fbb2e852f4a HTTP/1.1"</span><span style=color:#4271ae> 404 -
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/objects/5d/2ef7493690f6248a55c5657a23e5c25514240c HTTP/1.1"</span><span style=color:#4271ae> 404 -
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>]</span><span style=color:#4271ae> code 404, message File not found
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/objects/info/http-alternates HTTP/1.1"</span><span style=color:#4271ae> 404 -
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>]</span><span style=color:#4271ae> code 404, message File not found
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/objects/info/alternates HTTP/1.1"</span><span style=color:#4271ae> 404 -
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/objects/info/packs HTTP/1.1"</span><span style=color:#4271ae> 200 -
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/objects/pack/pack-34100ba6403aebd2e96fa73c67bce942b18a6264.idx HTTP/1.1"</span><span style=color:#4271ae> 200 -
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/objects/pack/pack-34100ba6403aebd2e96fa73c67bce942b18a6264.pack HTTP/1.1"</span><span style=color:#4271ae> 200 -
+</span></code></pre><p>Давайте же рассмотрим всё по порядку что здесь и как.<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/info/refs?service=git-upload-pack HTTP/1.1"</span><span style=color:#4271ae> 200 -
+</span></code></pre><p>Здесь git запрашивает инфу по репозиторию, а именно коммиты указывающие на ветки в репозитории.<p>В данном же примере этот файл содержит следующее:<pre style=color:#111;background-color:#f9f9f9><code><span>5d2ef7493690f6248a55c5657a23e5c25514240c    refs/heads/gh-pages
+</span><span>e29a0f6430889930005e6d3494e905aee019d4b5    refs/heads/master
+</span><span>4f2682ed22e139c2ccebe11705ccd49bf0b90c0b    refs/heads/release-update
+</span><span>9b7de41f6a27f7a3c7d3539ba4bc1fbb2e852f4a    refs/tags/v0.1.1
+</span><span>5054987a06ee024f3d9ddd15d3cde1a3e9da7a10    refs/tags/v0.1.1^{}
+</span></code></pre><p>Далее git хочет узнать какая ветка является главной и делает запрос к <code>HEAD</code><pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/HEAD HTTP/1.1"</span><span style=color:#4271ae> 200 -
+</span></code></pre><p>Файл <code>HEAD</code> же содержит только ссылку на master ветку<pre style=color:#111;background-color:#f9f9f9><code><span>ref: refs/heads/master
+</span></code></pre><p>Дальше git начинает выкачивать объекты по хешам. Здесь можно заметить что таких объектов нет, т.к. у всех 404 ошибка. Скорее всего из-за того что это bare репозиторий.<p>Можем немного схитрить и положить эти объекты в bare репозиторий, взяв их из основного. Просто скопируйте все папки (кроме <code>info</code> и <code>pack</code>) из репозитория в bare и обращение с клонированием репозитория сразу измениться.<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/info/refs?service=git-upload-pack HTTP/1.1"</span><span style=color:#4271ae> 200 -
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/HEAD HTTP/1.1"</span><span style=color:#4271ae> 200 -
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/objects/e2/9a0f6430889930005e6d3494e905aee019d4b5 HTTP/1.1"</span><span style=color:#4271ae> 200 -
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>]</span><span style=color:#4271ae> code 404, message File not found
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/objects/5d/2ef7493690f6248a55c5657a23e5c25514240c HTTP/1.1"</span><span style=color:#4271ae> 404 -
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>]</span><span style=color:#4271ae> code 404, message File not found
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>]</span><span style=color:#4271ae> code 404, message File not found
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/objects/4f/2682ed22e139c2ccebe11705ccd49bf0b90c0b HTTP/1.1"</span><span style=color:#4271ae> 200 -
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/objects/info/http-alternates HTTP/1.1"</span><span style=color:#4271ae> 404 -
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/objects/9b/7de41f6a27f7a3c7d3539ba4bc1fbb2e852f4a HTTP/1.1"</span><span style=color:#4271ae> 404 -
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>]</span><span style=color:#4271ae> code 404, message File not found
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/objects/info/alternates HTTP/1.1"</span><span style=color:#4271ae> 404 -
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/objects/6a/3a45cbb1646758e8a0b5538633b3ee11cdca1b HTTP/1.1"</span><span style=color:#4271ae> 200 -
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/objects/dd/ec125ea25e4c9a556efd229d8efcaca8acd951 HTTP/1.1"</span><span style=color:#4271ae> 200 -
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/objects/info/packs HTTP/1.1"</span><span style=color:#4271ae> 200 -
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/objects/pack/pack-34100ba6403aebd2e96fa73c67bce942b18a6264.idx HTTP/1.1"</span><span style=color:#4271ae> 200 -
+</span><span style=color:#c82728>127.0.0.1</span><span style=color:#4271ae> - - </span><span style=color:#8959a8>[</span><span style=color:#4271ae>XX/Yyy/ZZZZ AA:BB:CC</span><span style=color:#8959a8>] </span><span style=color:#839c00>"GET /tini.git/objects/pack/pack-34100ba6403aebd2e96fa73c67bce942b18a6264.pack HTTP/1.1"</span><span style=color:#4271ae> 200 -
+</span></code></pre><p>Но git всё равно обращается к объектам в директории <code>pack</code>, т.к. похоже не все объекты лежат так просто.<p>Для нашей реализации должно хватить эмуляции объектов по хешам.<p>Теперь с тем куда обращается git должно быть более-менее понятно, но встаёт вопрос: а что находиться в файлах с длинными именами (хэшами)?<p>Ну, вот например файл <code>/tini.git/objects/e2/9a0f6430889930005e6d3494e905aee019d4b5</code><pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>00000000</span><span style=color:#4271ae>  78 01 9d 8e 4d 6a c3 30  10 85 b3 d6 29 66 1f 08  </span><span style=color:#3e999f>|</span><span style=color:#c82728>x...Mj.0....</span><span>)</span><span style=color:#c82728>f..</span><span style=color:#3e999f>|
+</span><span style=color:#c82728>00000010</span><span style=color:#4271ae>  92 e5 51 64 08 21 59 f5  10 a5 8b d1 cc b8 09 48  </span><span style=color:#3e999f>|</span><span style=color:#c82728>..Qd.!Y........H</span><span style=color:#3e999f>|
+</span><span style=color:#c82728>00000020</span><span style=color:#4271ae>  91 71 e4 e2 de be 3a 43  e1 bd cd 07 ef 87 6b 29  </span><span style=color:#3e999f>|</span><span style=color:#c82728>.q....:C......k</span><span>)</span><span style=color:#3e999f>|
+</span><span style=color:#c82728>00000030</span><span style=color:#4271ae>  cf 06 03 9e 0f 6d 55 05  11 65 37 a0 52 f7 c8 13  </span><span style=color:#3e999f>|</span><span style=color:#c82728>.....mU..e7.R...</span><span style=color:#3e999f>|
+</span><span style=color:#c82728>00000040</span><span style=color:#4271ae>  21 06 9d 65 18 26 89 3a  33 31 45 62 99 d0 99 85  </span><span style=color:#3e999f>|</span><span>!</span><span style=color:#c82728>..e.</span><span style=color:#3e999f>&</span><span style=color:#c82728>.:31Eb....</span><span style=color:#3e999f>|
+</span><span style=color:#c82728>00000050</span><span style=color:#4271ae>  56 7d 35 08 e4 69 44 4e  c9 85 31 9c 31 6a 24 9b  </span><span style=color:#3e999f>|</span><span style=color:#c82728>V</span><span>}</span><span style=color:#c82728>5..iDN..1.1j$.</span><span style=color:#3e999f>|
+</span><span style=color:#c82728>00000060</span><span style=color:#4271ae>  10 7d 0c de 27 af ea 1c  0b 93 4b 86 b6 f6 a8 2b  </span><span style=color:#3e999f>|</span><span style=color:#c82728>.</span><span>}</span><span style=color:#c82728>..</span><span style=color:#839c00>'.....K....+|
+</span><span style=color:#839c00>00000070  dc b3 ee fa 0b 1f 35 6f  49 7f e0 22 eb 69 ee bb  |......5oI..".i..|
+</span><span style=color:#839c00>00000080  bc df be 0b 3d f3 89 6b  b9 82 43 17 ac ed 1a e1  |....=..k..C.....|
+</span><span style=color:#839c00>00000090  68 bd b5 a6 d3 fe b2 e9  7f f3 e6 73 5b e4 0b 48  |h..........s[..H|
+</span><span style=color:#839c00>000000a0  04 74 a7 b2 64 7d c3 5c  b3 f4 c2 56 3b e2 bc 89  |.t..d}.\...V;...|
+</span><span style=color:#839c00>000000b0  9a 3f b1 aa 54 12                                 |.?..T.|
+</span><span style=color:#839c00>000000b6
+</span></code></pre><p>Просто какие-то бинарные данные могли вы подумать и всгрустнуть. Но не всё так плохо, данные просто пожаты.<p>Давайте же используем магию питона и получим реальную информацию!<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>import </span><span>zlib
+</span><span>
+</span><span>c_data </span><span style=color:#3e999f>= </span><span style=color:#4271ae>open(</span><span style=color:#839c00>'~/tini.git/objects/e2/9a0f6430889930005e6d3494e905aee019d4b5'</span><span style=color:#4271ae>, </span><span style=color:#839c00>'rb'</span><span style=color:#4271ae>).</span><span style=color:#c82728>read</span><span style=color:#4271ae>()
+</span><span>d_data </span><span style=color:#3e999f>= </span><span style=color:#4271ae>zlib.</span><span style=color:#c82728>decompress</span><span style=color:#4271ae>(c_data)
+</span><span style=color:#4271ae>print(d_data)
+</span></code></pre><p>И получаем следующее<pre style=color:#111;background-color:#f9f9f9><code><span>b'commit 257\x00tree ddec125ea25e4c9a556efd229d8efcaca8acd951\nparent 6a3a45cbb1646758e8a0b5538633b3ee11cdca1b\nauthor Alexey Golubev &LTemail> 1516006004 +0300\ncommitter Alexey Golubev &LTemail> 1516006004 +0300\n\n[upd] add examples folder to exclude\n'
+</span></code></pre><p>Это уже интереснее, давайте я переформатирую вывод и расскажу что здесь что<pre style=color:#111;background-color:#f9f9f9><code><span>(1) commit 257\x00
+</span><span>(2) tree ddec125ea25e4c9a556efd229d8efcaca8acd951\n
+</span><span>(3) parent 6a3a45cbb1646758e8a0b5538633b3ee11cdca1b\n
+</span><span>(4) author Alexey Golubev &LTemail> 1516006004 +0300\n
+</span><span>(5) committer Alexey Golubev &LTemail> 1516006004 +0300\n\n
+</span><span>(6) [upd] add examples folder to exclude\n
+</span></code></pre><ol><li>говорит нам что это объект типа <code>commit</code> с длинной сообщения в 257 символов (2-6)<li>указывает на коммит с деревом объектов репозитория<li>ссылка на родительский коммит (можно проигнорировать, если это первый коммит)<li>авто коммита и время коммита в timestamp формате + временная зона<li>тот, кто залил этот коммит + также время<li>сообщение коммита</ol><p>Давайте теперь тогда перейдём к объекту <code>ddec125ea25e4c9a556efd229d8efcaca8acd951</code> и посмотрим что там (я сразу отформатирую вывод)<pre style=color:#111;background-color:#f9f9f9><code><span>(1) tree 286\x00
+</span><span>(2) 100644 .gitignore\x00\xa9\xd3|V\x0cj\xb8\xd4\xaf\xbfG\xed\xa6C\xe8\xc4.\x85w\x16
+</span><span>100644 .travis.yml\x00\xf0\xa0\xee!\x8d\x18>\x85CrY{I\xe9\x1al\xb0\x8cx3
+</span><span>100644 Cargo.toml\x00\xc1%\x1b\x1d\xe3\xb4\x81\xab\xda\xe6v\x18\x87\x86\t?e\xe5\xfcw
+</span><span>100644 LICENSE\x00J\xf4\xb0R\xe8\x9c4=\x8c\x86\\\xd2\xbd\x14}U=v\xe9\xb2
+</span><span>100644 README.md\x00<\xfe\xac\xbe$\xc0\xf9C\x95[$\xeb\xd5T\xfb\xb3\x0e1l\x19
+</span><span>(3) 40000 examples\x00\xc5#\xa5\xb6 ~"\xff\x83\x8a\xea\xfe\x89\x13\xa2\x93W\xa7\x8e\x13
+</span><span>40000 scripts\x00\x8d\x8ac3\xaa\x15\xa7P?KN\x1f\xd1\xf3\xed\x19\xbd\xd1\x07\x15
+</span><span>40000 src\x00#\xe2vA\xb1(M\xe2\xf2\x00\x8c.\xb8\xaej\x8a\xe6\x19\x0f\xef
+</span></code></pre><ol><li>объект типа <code>tree</code> с данными на 286 символов<li>сначала права на файл, потом имя файла, а потом какие-то бинарные данные<li>аналогично, но это похоже на папку</ol><p>Встаёт вопрос, что за бинарные данные. Давайте представим в более читаемом виде (hex)<pre style=color:#111;background-color:#f9f9f9><code><span>a9d37c560c6ab8d4afbf47eda643e8c42e857716
+</span></code></pre><p>О, а это уже похоже на хэш (коммит). Значит можно поискать этот файл в папке с объектами и посмотреть что там внутри.<p>Но быстро обламываемся, т.к. в репозитории нет такого файла <code>~/tini.git/objects/a9/d37c560c6ab8d4afbf47eda643e8c42e857716</code>.<p>Не беда, давайте возьмём другой файл, например <code>.travis.yml</code> и попытаем счастье с ним.<pre style=color:#111;background-color:#f9f9f9><code><span>blob 351\x00
+</span><span>language: rust\n
+</span><span>rust:\n
+</span><span>... далее вывод опущен ...
+</span></code></pre><p>Получаем новый тип данных - <code>blob</code>.<p>На этом моменте можно остановиться, т.к. для нашей задачи хватит этих объектов.<p>Но стоит обсудить ещё одну вешь - откуда берётся хэш объекта? Всё просто - это sha1 от данных!<h1 id=pilim-feik>Пилим фейк</h1><p>Для реализации веб-сервера я будет достаточно <code>Flask</code> и пары стандартных библиотек.<p>Представлю сразу код с комментариями.<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8e908c># время нужно для коммита
+</span><span style=color:#8959a8>from </span><span>datetime </span><span style=color:#8959a8>import </span><span>datetime </span><span style=color:#8959a8>as </span><span>dt
+</span><span style=color:#8e908c># git использует sha1 для расчёта хэшей
+</span><span style=color:#8959a8>from </span><span>hashlib </span><span style=color:#8959a8>import </span><span>sha1
+</span><span style=color:#8e908c># zlib для упаковки данных
+</span><span style=color:#8959a8>import </span><span>zlib
+</span><span>
+</span><span style=color:#8e908c># и Flask для сервера
+</span><span style=color:#8959a8>from </span><span>flask </span><span style=color:#8959a8>import </span><span>Flask, Response
+</span><span>
+</span><span>
+</span><span>app </span><span style=color:#3e999f>= </span><span style=color:#c82728>Flask</span><span style=color:#4271ae>(__name__)
+</span><span>
+</span><span style=color:#8e908c># вспомогательная функция для расчёта хэша
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>hash</span><span>(</span><span style=color:#f07219>data</span><span>):
+</span><span>    x </span><span style=color:#3e999f>= </span><span style=color:#c82728>sha1</span><span style=color:#4271ae>(data)
+</span><span>    </span><span style=color:#8959a8>return </span><span style=color:#4271ae>x.</span><span style=color:#c82728>digest</span><span style=color:#4271ae>()</span><span>, </span><span style=color:#4271ae>x.</span><span style=color:#c82728>hexdigest</span><span style=color:#4271ae>()
+</span><span>
+</span><span>
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>generate_commit</span><span>(</span><span style=color:#f07219>tree</span><span>, </span><span style=color:#f07219>author</span><span>, </span><span style=color:#f07219>committer</span><span>, </span><span style=color:#f07219>msg</span><span>):
+</span><span>    </span><span style=color:#8e908c>"""функция для генерации коммита
+</span><span style=color:#8e908c>        tree - хэш на tree объект
+</span><span style=color:#8e908c>        author и commiter - очевидно
+</span><span style=color:#8e908c>        msg - текст коммита
+</span><span style=color:#8e908c>    """
+</span><span>    </span><span style=color:#8e908c># получаем дату в нужном формате
+</span><span>    curr_date </span><span style=color:#3e999f>= </span><span style=color:#8959a8>f</span><span style=color:#839c00>'</span><span>{</span><span style=color:#c99e00>int</span><span style=color:#4271ae>(dt.</span><span style=color:#c82728>now</span><span style=color:#4271ae>().</span><span style=color:#c82728>timestamp</span><span style=color:#4271ae>())</span><span>}</span><span style=color:#839c00> +0000'
+</span><span>    </span><span style=color:#8e908c># формируем сообщение
+</span><span>    data </span><span style=color:#3e999f>= </span><span style=color:#8959a8>f</span><span style=color:#839c00>'tree </span><span>{tree}</span><span style=color:#f07219>\n</span><span style=color:#839c00>author </span><span>{author} {curr_date}</span><span style=color:#f07219>\n</span><span style=color:#839c00>committer </span><span>{committer} {curr_date}</span><span style=color:#f07219>\n\n</span><span>{msg}</span><span style=color:#f07219>\n</span><span style=color:#839c00>'
+</span><span>    </span><span style=color:#8e908c># всё сообщение с длинной + бинарный вид
+</span><span>    commit </span><span style=color:#3e999f>= </span><span style=color:#8959a8>f</span><span style=color:#839c00>'commit </span><span>{</span><span style=color:#4271ae>len(data)</span><span>}</span><span style=color:#f07219>\x00</span><span>{data}</span><span style=color:#839c00>'</span><span style=color:#4271ae>.</span><span style=color:#c82728>encode</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># нам нужен хэш от этого сообщения, чтобы на него можно было сделать ссылку
+</span><span>    </span><span style=color:#c82728>_</span><span>, h </span><span style=color:#3e999f>= </span><span style=color:#4271ae>hash(commit)
+</span><span>    </span><span style=color:#8959a8>return </span><span>h, commit
+</span><span>
+</span><span>
+</span><span style=color:#8e908c># данная функция генерирует дерево из одного файла
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>generate_tree</span><span>(</span><span style=color:#f07219>name</span><span>, </span><span style=color:#f07219>permission</span><span>, </span><span style=color:#f07219>file</span><span>):
+</span><span>    </span><span style=color:#8e908c>"""функция для генерации tree объекта
+</span><span style=color:#8e908c>        name - имя файла
+</span><span style=color:#8e908c>        permission - его права
+</span><span style=color:#8e908c>        file - хэш указывающий на blob
+</span><span style=color:#8e908c>    """
+</span><span>    </span><span style=color:#8e908c># формируем данные по шаблону
+</span><span>    data </span><span style=color:#3e999f>= </span><span style=color:#8959a8>f</span><span style=color:#839c00>'</span><span>{permission} {name}</span><span style=color:#f07219>\x00</span><span style=color:#839c00>'</span><span style=color:#4271ae>.</span><span style=color:#c82728>encode</span><span style=color:#4271ae>() </span><span style=color:#3e999f>+ </span><span>file
+</span><span>    tree </span><span style=color:#3e999f>= </span><span style=color:#8959a8>f</span><span style=color:#839c00>'tree </span><span>{</span><span style=color:#4271ae>len(data)</span><span>}</span><span style=color:#f07219>\x00</span><span style=color:#839c00>'</span><span style=color:#4271ae>.</span><span style=color:#c82728>encode</span><span style=color:#4271ae>() </span><span style=color:#3e999f>+ </span><span>data
+</span><span>    </span><span style=color:#8e908c># получаем хэш
+</span><span>    </span><span style=color:#c82728>_</span><span>, h </span><span style=color:#3e999f>= </span><span style=color:#4271ae>hash(tree)
+</span><span>    </span><span style=color:#8959a8>return </span><span>h, tree
+</span><span>
+</span><span>
+</span><span>
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>generate_blob</span><span>(</span><span style=color:#f07219>data</span><span>):
+</span><span>    </span><span style=color:#8e908c>"""функция для генерации blob`а
+</span><span style=color:#8e908c>        data -- содержимое файла
+</span><span style=color:#8e908c>    """
+</span><span>    blob </span><span style=color:#3e999f>= </span><span style=color:#8959a8>f</span><span style=color:#839c00>'blob </span><span>{</span><span style=color:#4271ae>len(data)</span><span>}</span><span style=color:#f07219>\x00</span><span>{data}</span><span style=color:#839c00>'</span><span style=color:#4271ae>.</span><span style=color:#c82728>encode</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8e908c># тут нам нужен хэш в двух видах
+</span><span>    d, h </span><span style=color:#3e999f>= </span><span style=color:#4271ae>hash(blob)
+</span><span>    </span><span style=color:#8959a8>return </span><span>d, h, blob
+</span><span>
+</span><span>
+</span><span style=color:#8e908c># ссылка на мастер
+</span><span>head_ref </span><span style=color:#3e999f>= </span><span style=color:#839c00>'refs/heads/master'
+</span><span style=color:#8e908c># blob
+</span><span>blob_d, blob_hash, blob_data </span><span style=color:#3e999f>= </span><span style=color:#c82728>generate_blob</span><span style=color:#4271ae>(</span><span style=color:#839c00>'Oh, Hi Mark!'</span><span style=color:#4271ae>)
+</span><span style=color:#8e908c># tree ^
+</span><span>tree_hash, tree_data </span><span style=color:#3e999f>= </span><span style=color:#c82728>generate_tree</span><span style=color:#4271ae>(</span><span style=color:#839c00>'README.md'</span><span style=color:#4271ae>, </span><span style=color:#839c00>'100644'</span><span style=color:#4271ae>, blob_d)
+</span><span style=color:#8e908c># commit ^
+</span><span>commit_hash, commit_data </span><span style=color:#3e999f>= </span><span style=color:#c82728>generate_commit</span><span style=color:#4271ae>(tree_hash, </span><span style=color:#839c00>'Your Dog &LTgood-boi>'</span><span style=color:#4271ae>, </span><span style=color:#839c00>'Your Cat &LTgood-cat>'</span><span style=color:#4271ae>, </span><span style=color:#839c00>'Hello there!'</span><span style=color:#4271ae>)
+</span><span style=color:#8e908c># и собираем в словарь для удобства
+</span><span>data_by_hash </span><span style=color:#3e999f>= </span><span>{
+</span><span>    blob_hash: blob_data,
+</span><span>    tree_hash: tree_data,
+</span><span>    commit_hash: commit_data
+</span><span>}
+</span><span>
+</span><span style=color:#8e908c># фейк файла &LTrepo-name>//info/refs?service=git-upload-pack
+</span><span>@app.</span><span style=color:#c82728>route</span><span>(</span><span style=color:#839c00>'/&LTpath:repo>/&LTpath:folder>/&LTpath:file>'</span><span>, </span><span style=color:#f07219>methods</span><span style=color:#3e999f>=</span><span>[</span><span style=color:#839c00>'GET'</span><span>])
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>refs</span><span>(</span><span style=color:#f07219>repo</span><span>, </span><span style=color:#f07219>folder</span><span>, </span><span style=color:#f07219>file</span><span>):
+</span><span>    </span><span style=color:#8959a8>if </span><span>folder </span><span style=color:#3e999f>== </span><span style=color:#839c00>'info' </span><span style=color:#3e999f>and </span><span style=color:#4271ae>file.</span><span style=color:#c82728>startswith</span><span style=color:#4271ae>(</span><span style=color:#839c00>'refs'</span><span style=color:#4271ae>)</span><span>:
+</span><span>        </span><span style=color:#8e908c># возвращаем хэш коммита с указанием на то, что он master
+</span><span>        </span><span style=color:#8959a8>return f</span><span style=color:#839c00>'</span><span>{commit_hash}</span><span style=color:#f07219>\t</span><span>{head_ref}</span><span style=color:#f07219>\n</span><span style=color:#839c00>'</span><span>, </span><span style=color:#f07219>200
+</span><span>    </span><span style=color:#8959a8>else</span><span>:
+</span><span>        </span><span style=color:#8959a8>return </span><span style=color:#839c00>''</span><span>, </span><span style=color:#f07219>400
+</span><span>
+</span><span style=color:#8e908c># обработка HEAD файла
+</span><span>@app.</span><span style=color:#c82728>route</span><span>(</span><span style=color:#839c00>'/&LTpath:repo>/HEAD'</span><span>, </span><span style=color:#f07219>methods</span><span style=color:#3e999f>=</span><span>[</span><span style=color:#839c00>'GET'</span><span>])
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>head</span><span>(</span><span style=color:#f07219>repo</span><span>):
+</span><span>    </span><span style=color:#8e908c># ссылка на master
+</span><span>    </span><span style=color:#8959a8>return f</span><span style=color:#839c00>'ref: </span><span>{head_ref}</span><span style=color:#f07219>\n</span><span style=color:#839c00>'</span><span>, </span><span style=color:#f07219>200
+</span><span>
+</span><span style=color:#8e908c># обработка объектов
+</span><span>@app.</span><span style=color:#c82728>route</span><span>(</span><span style=color:#839c00>'/&LTpath:repo>/&LTpath:folder>/&LTpath:f1>/&LTpath:f2>'</span><span>, </span><span style=color:#f07219>methods</span><span style=color:#3e999f>=</span><span>[</span><span style=color:#839c00>'GET'</span><span>])
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>objects</span><span>(</span><span style=color:#f07219>repo</span><span>, </span><span style=color:#f07219>folder</span><span>, </span><span style=color:#f07219>f1</span><span>, </span><span style=color:#f07219>f2</span><span>):
+</span><span>    </span><span style=color:#8e908c># получаем объект по хэшу
+</span><span>    data </span><span style=color:#3e999f>= </span><span style=color:#4271ae>data_by_hash.</span><span style=color:#c82728>get</span><span style=color:#4271ae>(f1 </span><span style=color:#3e999f>+ </span><span style=color:#4271ae>f2)
+</span><span>    </span><span style=color:#8959a8>if </span><span>data:
+</span><span>        </span><span style=color:#8e908c># возвращаем сжатые данные
+</span><span>        </span><span style=color:#8959a8>return </span><span style=color:#c82728>Response</span><span style=color:#4271ae>(zlib.</span><span style=color:#c82728>compress</span><span style=color:#4271ae>(data), </span><span style=color:#f07219>content_type</span><span style=color:#3e999f>=</span><span style=color:#839c00>'application/octet-stream'</span><span style=color:#4271ae>)
+</span><span>    </span><span style=color:#8959a8>else</span><span>:
+</span><span>        </span><span style=color:#8959a8>return </span><span style=color:#839c00>''</span><span>, </span><span style=color:#f07219>400
+</span></code></pre><p>И этого хватит чтобы обдурить git.<p><a href=https://gist.github.com/FreeCX/bd672d3ddada072dcc79d426e95c3909>Ссылка на исходник в gist</a><h1 id=rezul-tat>Результат</h1><p>Теперь только остаётся только запустить наш фейковый сервер и успешно склонировать репозиторий<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> git clone http://localhost:5000/fake.git
+</span></code></pre><h1 id=chto-pochitat>Что почитать</h1><ol><li>Я ничего не использовал, так что не будет ссылок<li>Иди нормальные книжки лучше почитай!</ol></article><div class=back><a href=https://freecx.github.io/>Назад</a></div><div class=footer><span>Также читайте <a title="ты сам сломал ссылку, так что ничего личного" href=https://antoniii.github.io/> <s>antoniii</s> </a> <a href=https://citrux.github.io/>citrux</a> <a href=https://sputnikas.github.io/>sputnikas</a> </span></div><script>let msg=` А спонсор статей в моём блоге -- моя лень -- спонсор статей.`;[`=`.repeat(msg.length+ 1),msg,`=`.repeat(msg.length+ 1)].forEach(a=>console.warn(a))</script>

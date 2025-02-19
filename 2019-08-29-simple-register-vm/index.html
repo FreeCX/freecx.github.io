@@ -1,0 +1,409 @@
+<!doctype html><html lang=ru><head><meta charset=utf-8><meta content="IE=edge" http-equiv=X-UA-Compatible><meta content="width=device-width,initial-scale=1" name=viewport><title>Пишем регистровую машину</title><meta content="Кодерный понедельник" name=description><meta content=https://freecx.github.io/touch-icon.png property=og:image><link href=https://code.cdn.mozilla.net/fonts/fira.css rel=stylesheet><link href=https://freecx.github.io/favicon.png rel=icon><link href=https://freecx.github.io/touch-icon.png rel=apple-touch-icon><link href=https://freecx.github.io/main.css rel=stylesheet><link href=https://freecx.github.io/syntax.css rel=stylesheet><body><aside class=logo><a href=https://github.com/FreeCX> <img class=gravatar src=https://freecx.github.io/avatar.png> </a><span class=logo-prompt>Я на github</span></aside><article><div class=center><h1>Пишем регистровую машину</h1><time>29 August 2019</time></div><div class=divider></div><p>Что-то давно я не писал в свой блог. Нужно исправлять данное недоразумение.<p>И сегодня в программе: регистровая виртуальную машину на языке Rust.<h1 id=vvedenie>Введение</h1><p>На написание собственной упрощенной версии меня вдохновили несколько статей с хабра, ссылки на них смотри в разделе [Полезные ссылки](#Полезные ссылки).<p>Но для начала давайте определимся с терминалогией <a href=https://ru.wikipedia.org/wiki/%D0%92%D0%B8%D1%80%D1%82%D1%83%D0%B0%D0%BB%D1%8C%D0%BD%D0%B0%D1%8F_%D0%BC%D0%B0%D1%88%D0%B8%D0%BD%D0%B0>с помощью вики</a>.<blockquote><p>Виртуальная машина (VM, от англ. virtual machine) — программная и/или аппаратная система, эмулирующая аппаратное обеспечение некоторой платформы (target — целевая, или гостевая платформа) и исполняющая программы для target-платформы на host-платформе (host — хост-платформа, платформа-хозяин) или виртуализирующая некоторую платформу и создающая на ней среды, изолирующие друг от друга программы и даже операционные системы (см.: песочница); также спецификация некоторой вычислительной среды (например: «виртуальная машина языка программирования Си»).</blockquote><p>В общем разработанная нами программа не является в полной мере виртуальной машиной, а скорее всего её стоит называть интерпретатором кода. Эти разбирательства в терминологии я оставляю на читателя.<p>Давайте теперь перейдём к определение стековой машины — в общем говоря их два вида: стековая и регистровая и исходя из названий можно понять, что стековая машина использует для расчёт стек, а регистровая регистры... Но это не совсем так, в основном стековая использует только стек, а вот регистровая может использовать регистры и стек. Но это опять же терминологические фишки.<p>Мы же в своей реализации будем использовать только регистровую модель.<p>Вроде определились со всеми важными аспектами и теперь можно перейти к примеру, на котором будем проводить тесты.<h1 id=testovyi-primer>Тестовый пример</h1><p>Наша задачка основана на Гипотезе Коллатца и звучит вот так:<pre style=color:#111;background-color:#f9f9f9><code><span>Следующая повторяющаяся последовательность определена для множества натуральных чисел:
+</span><span>n → n/2 (n - чётное)
+</span><span>n → 3n + 1 (n - нечётное)
+</span><span>
+</span><span>Используя описанное выше правило и начиная с 13, сгенерируется следующая последовательность:
+</span><span>13 → 40 → 20 → 10 → 5 → 16 → 8 → 4 → 2 → 1
+</span><span>
+</span><span>Получившаяся последовательность (начиная с 13 и заканчивая 1) содержит 10 элементов.
+</span><span>
+</span><span>Какой начальный элемент меньше миллиона генерирует самую длинную последовательность?
+</span></code></pre><p>В нашем же примере будем делать расчёт от единицы до миллиона и для интереса реализуем её на нескольких языках:<ul><li>для языка Python<li>для языка Rust<li>для нашей виртуальной машин, назовём её <code>vm_asm</code></ul><p>Также стоит уточнить, что реализацию будем делать наивную чтобы не мучится с оптимизацией, да и это не самоцель для данного поста.<h2 id=algoritm-nakhozhdeniia-dliny-tsepochki>Алгоритм нахождения длины цепочки</h2><p>Входные параметры:<ul><li>start_value — начальное значение</ul><p>Выходные параметры:<ul><li>seq_length — длина последовательности</ul><p>Алгоритм:<ol><li>установить значение start_value в 0<li>цикл пока seq_length > 1 <ul><li>если остаток от деления seq_length на 2 равен нулю, то: <ul><li>поделить с округлением вниз start_value на 2<li>увеличить seq_length на 1</ul><li>иначе <ul><li>умножить start_value на 3 и прибавить единицу<li>поделить с округлением вниз start_value на 2<li>увеличить seq_length на 2</ul></ul></ol><p>Вы могли заметить, что в блоке с "иначе" мы делаем сразу два шага и вы будете правы. Это небольшая оптимизация, на которую я пошёл :)<h2 id=realizatsiia-na-python>Реализация на Python</h2><p>На Python код будет выглядеть следующим образом:<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>def </span><span style=color:#4271ae>calc</span><span>(</span><span style=color:#f07219>index</span><span>):
+</span><span>    step </span><span style=color:#3e999f>= </span><span style=color:#f07219>0
+</span><span>    </span><span style=color:#8959a8>while </span><span>index </span><span style=color:#3e999f>> </span><span style=color:#f07219>1</span><span>:
+</span><span>        </span><span style=color:#8959a8>if </span><span>index </span><span style=color:#3e999f>% </span><span style=color:#f07219>2 </span><span style=color:#3e999f>== </span><span style=color:#f07219>0</span><span>:
+</span><span>            index </span><span style=color:#3e999f>//= </span><span style=color:#f07219>2
+</span><span>            step </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1
+</span><span>        </span><span style=color:#8959a8>else</span><span>:
+</span><span>            index </span><span style=color:#3e999f>= </span><span>(</span><span style=color:#f07219>3 </span><span style=color:#3e999f>* </span><span>index </span><span style=color:#3e999f>+ </span><span style=color:#f07219>1</span><span>) </span><span style=color:#3e999f>// </span><span style=color:#f07219>2
+</span><span>            step </span><span style=color:#3e999f>+= </span><span style=color:#f07219>2
+</span><span>    </span><span style=color:#8959a8>return </span><span>step
+</span></code></pre><p>Остаётся только перебрать все значения от 1 и до 1_000_000 включительно и выбрать максимально длинную цепочку, что можно сделать вот так:<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span>result </span><span style=color:#3e999f>= </span><span style=color:#f07219>0
+</span><span style=color:#8959a8>for </span><span>i </span><span style=color:#8959a8>in </span><span style=color:#4271ae>range(</span><span style=color:#f07219>1</span><span style=color:#4271ae>, </span><span style=color:#f07219>1000001</span><span style=color:#4271ae>)</span><span>:
+</span><span>    result </span><span style=color:#3e999f>= </span><span style=color:#4271ae>max(result, </span><span style=color:#c82728>calc</span><span style=color:#4271ae>(i))
+</span><span style=color:#4271ae>print(result)
+</span></code></pre><h2 id=realizatsiia-na-rust>Реализация на Rust</h2><p>Реализация на языке Rust мало чем отличается от питоновского, лишь только синтаксис по другому выглядит и используется функция <code>main</code>.<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>fn </span><span style=color:#4271ae>calc</span><span>(</span><span style=color:#8959a8>mut </span><span style=color:#f07219>index</span><span>: </span><span style=color:#8959a8>u64</span><span>) -> </span><span style=color:#8959a8>u64 </span><span>{
+</span><span>    </span><span style=color:#8959a8>let mut</span><span> step </span><span style=color:#3e999f>= </span><span style=color:#f07219>0</span><span>;
+</span><span>    </span><span style=color:#8959a8>while</span><span> index </span><span style=color:#3e999f>> </span><span style=color:#f07219>1 </span><span>{
+</span><span>        </span><span style=color:#8959a8>if</span><span> index </span><span style=color:#3e999f>% </span><span style=color:#f07219>2 </span><span style=color:#3e999f>== </span><span style=color:#f07219>0 </span><span>{
+</span><span>            index </span><span style=color:#3e999f>/= </span><span style=color:#f07219>2</span><span>;
+</span><span>            step </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>        } </span><span style=color:#8959a8>else </span><span>{
+</span><span>            index </span><span style=color:#3e999f>= </span><span>(</span><span style=color:#f07219>3 </span><span style=color:#3e999f>*</span><span> index </span><span style=color:#3e999f>+ </span><span style=color:#f07219>1</span><span>) </span><span style=color:#3e999f>/ </span><span style=color:#f07219>2</span><span>;
+</span><span>            step </span><span style=color:#3e999f>+= </span><span style=color:#f07219>2</span><span>;
+</span><span>        }
+</span><span>    }
+</span><span>    step
+</span><span>}
+</span><span>
+</span><span style=color:#8959a8>fn </span><span style=color:#4271ae>main</span><span>() {
+</span><span>    </span><span style=color:#8959a8>let mut</span><span> result </span><span style=color:#3e999f>= </span><span style=color:#f07219>0</span><span>;
+</span><span>    </span><span style=color:#8959a8>for</span><span> i </span><span style=color:#3e999f>in </span><span style=color:#f07219>1</span><span style=color:#3e999f>..</span><span style=color:#f07219>1_000_001 </span><span>{
+</span><span>        result </span><span style=color:#3e999f>=</span><span> result.</span><span style=color:#4271ae>max</span><span>(</span><span style=color:#4271ae>calc</span><span>(i));
+</span><span>    }
+</span><span>    println!(</span><span style=color:#839c00>"</span><span>{:?}</span><span style=color:#839c00>"</span><span>, result);
+</span><span>}
+</span></code></pre><h2 id=realizatsiia-na-virtual-noi-mashine>Реализация на виртуальной машине</h2><p>Приступим к самому интересному, а именно к коду для виртуальной машины.<p>Я буду полагаться на Intel-подобный синтаксис ассемблера, т.к. он намного привычнее выглядит чем от AT&T.<p>И да, программа будет на ассемблере, так как его опкоды с операндами намного легче парсить, чем любой императивный язык программирования.<p>Начнём!<p>Сначала произведём инициализацию регистров необходимыми значениями<pre class=language-asm data-lang=asm style=color:#111;background-color:#f9f9f9><code class=language-asm data-lang=asm><span style=color:#4271ae># r0 </span><span>-- </span><span style=color:#4271ae>выходной результат
+</span><span style=color:#8959a8>mov </span><span style=color:#4271ae>r0</span><span>, </span><span style=color:#f07219>0
+</span><span style=color:#4271ae># r1 </span><span>-- </span><span style=color:#4271ae>конечное значения для внешнего цикла for
+</span><span style=color:#8959a8>mov </span><span style=color:#4271ae>r1</span><span>, </span><span style=color:#f07219>1000001
+</span><span style=color:#4271ae># r2 </span><span>-- </span><span style=color:#4271ae>внешний индекс для цикл for
+</span><span style=color:#8959a8>mov </span><span style=color:#4271ae>r2</span><span>, </span><span style=color:#f07219>1
+</span></code></pre><p>Определим внешний цикл от for<pre class=language-asm data-lang=asm style=color:#111;background-color:#f9f9f9><code class=language-asm data-lang=asm><span style=color:#4271ae># внешний цикл for
+</span><span style=color:#4271ae>_next_step:
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>inc </span><span style=color:#4271ae>r2
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>cmp </span><span style=color:#4271ae>r2</span><span>, </span><span style=color:#4271ae>r1
+</span><span style=color:#4271ae>    # переход к печати результата
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>jg </span><span style=color:#4271ae>_end_of_app
+</span></code></pre><p>И последующий за ней блок с "функцией"<pre class=language-asm data-lang=asm style=color:#111;background-color:#f9f9f9><code class=language-asm data-lang=asm><span style=color:#4271ae>_calc_start:
+</span><span style=color:#4271ae>    # r3 </span><span>-- </span><span style=color:#4271ae>текущая длина цепочки (цикл while)
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>mov </span><span style=color:#4271ae>r3</span><span>, </span><span style=color:#f07219>0
+</span><span style=color:#4271ae>    # r4 </span><span>-- </span><span style=color:#4271ae>текущий индекс (цикл while)
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>mov </span><span style=color:#4271ae>r4</span><span>, </span><span style=color:#4271ae>r2
+</span></code></pre><p>Внутренний цикл while выглядит немного мудрено, но это по сути прямой перенос питоновского кода на ассемблер<pre class=language-asm data-lang=asm style=color:#111;background-color:#f9f9f9><code class=language-asm data-lang=asm><span style=color:#4271ae># внутренний цикл while
+</span><span style=color:#4271ae>_while:
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>cmp </span><span style=color:#4271ae>r4</span><span>, </span><span style=color:#f07219>1
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>jle </span><span style=color:#4271ae>_end_of_calc
+</span><span style=color:#4271ae>    # r5 временный регистр для проверки на index % </span><span style=color:#f07219>2 </span><span style=color:#4271ae>== </span><span style=color:#f07219>0
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>mov </span><span style=color:#4271ae>r5</span><span>, </span><span style=color:#4271ae>r4
+</span><span style=color:#4271ae>    mod r5</span><span>, </span><span style=color:#f07219>2
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>cmp </span><span style=color:#4271ae>r5</span><span>, </span><span style=color:#f07219>0
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>jne </span><span style=color:#4271ae>_3n_part
+</span><span style=color:#4271ae>    # ветка при index % </span><span style=color:#f07219>2 </span><span style=color:#4271ae>== </span><span style=color:#f07219>0
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>shr </span><span style=color:#4271ae>r4</span><span>, </span><span style=color:#f07219>1
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>inc </span><span style=color:#4271ae>r3
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>jmp </span><span style=color:#4271ae>_while
+</span><span>
+</span><span style=color:#4271ae># ветка при index % </span><span style=color:#f07219>2 </span><span style=color:#4271ae>!= </span><span style=color:#f07219>0
+</span><span style=color:#4271ae>_3n_part:
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>mul </span><span style=color:#4271ae>r4</span><span>, </span><span style=color:#f07219>3
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>inc </span><span style=color:#4271ae>r4
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>shr </span><span style=color:#4271ae>r4</span><span>, </span><span style=color:#f07219>1
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>add </span><span style=color:#4271ae>r3</span><span>, </span><span style=color:#f07219>2
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>jmp </span><span style=color:#4271ae>_while
+</span></code></pre><p>Остаётся только выбрать максимальное значение цепочки и вывести на печать значение, если обход закончен<pre class=language-asm data-lang=asm style=color:#111;background-color:#f9f9f9><code class=language-asm data-lang=asm><span style=color:#4271ae># выбора максимальной длины цепочки
+</span><span style=color:#4271ae>_end_of_calc:
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>cmp </span><span style=color:#4271ae>r3</span><span>, </span><span style=color:#4271ae>r0
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>jle </span><span style=color:#4271ae>_next_step
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>mov </span><span style=color:#4271ae>r0</span><span>, </span><span style=color:#4271ae>r3
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>jmp </span><span style=color:#4271ae>_next_step
+</span><span>
+</span><span style=color:#4271ae># вывод результата
+</span><span style=color:#4271ae>_end_of_app:
+</span><span style=color:#4271ae>    print r0
+</span></code></pre><h1 id=realizatsiia-interpretatora>Реализация интерпретатора</h1><p>Так как я не очень хочу реализовывать весь функционал какого-то процессора, то ограничимся небольшим набором команд, который нужен нам для решения задачки.<p>Исходя ранее написанного кода можно выделить следующий набор команд:<ul><li><code>mov #1, #2</code> — поместить значение из #2 в #1<li><code>cmp #1, #1</code> — сравнить #1 и #2 и изменить регистровые флаги<li><code>jg #1</code> — перейти к #1 если F1 равен 0<li><code>jle #1</code> — перейти к #1 если F1 не равен 0<li><code>jne #</code> — переход к #1 если F2 равен 0<li><code>jmp #1</code> — безусловный переход к метку #1<li><code>inc #1</code> — увеличить #1 на единицу<li><code>mod #1, #2</code> — деление модулю #1 на #2<li><code>add #1, #2</code> — добавить #2 к #1<li><code>mul #1, #2</code> — умножить #1 на #2<li><code>shr #1, #2</code> — логический сдвиг вправо #1 на #2<li><code>print #1</code> — вывести значение #1 в консоль</ul><p>Здесь <code>F1</code> и <code>F2</code> два регистровых флага, о которых поговорим позднее.<p>Теперь давайте определимся с работой нашего интерпретатора, то есть с шагами которые он должен выполнить:<ul><li>Загрузить файл исходного кода<li>Разобрать каждую строку на инструкцию<li>Выполнить код</ul><p>Давайте для начала определим сущность виртуальной машины<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>struct </span><span>VirtualMachine {
+</span><span>    </span><span style=color:#c82728>ip</span><span>: </span><span style=color:#8959a8>u8</span><span>,
+</span><span>    </span><span style=color:#c82728>reg</span><span>: [</span><span style=color:#8959a8>u64</span><span>; 8],
+</span><span>    </span><span style=color:#c82728>app</span><span>: </span><span style=color:#c99e00>Vec</span><span>&LTOpcode>,
+</span><span>    </span><span style=color:#c82728>label</span><span>: HashMap<</span><span style=color:#c99e00>String</span><span>, </span><span style=color:#8959a8>u8</span><span>>,
+</span><span>    </span><span style=color:#c82728>flags</span><span>: [</span><span style=color:#8959a8>bool</span><span>; 2]
+</span><span>}
+</span></code></pre><p>У нас будет:<ul><li>указатель на выполняемую инструкцию <code>ip</code>, так называемый Instruction Pointer<li>восемь 64-х байтовых регистра <code>reg</code>, так как много нам их и не надо<li>вектор с опкодами приложения <code>app</code>, то есть наша программа<li>хэшмап с метками <code>label</code> для реализации произвольного перехода к командам программы<li>и два флага, так называемый Регистр Флагов, но в упрощенном виде</ul><p>Для упрощения написания программы регистр флагов у нас представляется только двумя значениями, хотя всегда можно реализовать весь их набор.<p>Установку флагов <code>F1</code> и <code>F2</code> будем делать вот таким образом — при сравнении двух значений с помощью опкода <code>cmp</code>:<ul><li>если #1 больше #2, то <code>F1 = 1</code>, иначе <code>F1 = 0</code><li>если #1 равен #2, то <code>F2 = 1</code>, иначе <code>F2 = 0</code></ul><p>здесь #1 — первый операнд, #2 — второй операд.<p>Теперь можно определить перечисление с нашим набором команд<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>enum </span><span>Opcode {
+</span><span>    </span><span style=color:#8e908c>// сложение двух регистров
+</span><span>    ADD_r { r1: </span><span style=color:#8959a8>u8</span><span>, r2: </span><span style=color:#8959a8>u8 </span><span>},
+</span><span>    </span><span style=color:#8e908c>// сложение регистра и значения
+</span><span>    ADD_v { r1: </span><span style=color:#8959a8>u8</span><span>, v1: </span><span style=color:#8959a8>u64 </span><span>},
+</span><span>    </span><span style=color:#8e908c>// инкремент регистра
+</span><span>    INC { r1: </span><span style=color:#8959a8>u8 </span><span>},
+</span><span>    </span><span style=color:#8e908c>// деление по модулю (регистр на регистр)
+</span><span>    MOD_r { r1: </span><span style=color:#8959a8>u8</span><span>, r2: </span><span style=color:#8959a8>u8 </span><span>},
+</span><span>    </span><span style=color:#8e908c>// деление по модулю (регистр на значение)
+</span><span>    MOD_v { r1: </span><span style=color:#8959a8>u8</span><span>, v1: </span><span style=color:#8959a8>u64 </span><span>},
+</span><span>    </span><span style=color:#8e908c>// перемножение двух регистров
+</span><span>    MUL_r { r1: </span><span style=color:#8959a8>u8</span><span>, r2: </span><span style=color:#8959a8>u8 </span><span>},
+</span><span>    </span><span style=color:#8e908c>// умножение регистра на значение
+</span><span>    MUL_v { r1: </span><span style=color:#8959a8>u8</span><span>, v1: </span><span style=color:#8959a8>u64 </span><span>},
+</span><span>    </span><span style=color:#8e908c>// сдвиг регистра на значение из другого регистра
+</span><span>    SHR_r { r1: </span><span style=color:#8959a8>u8</span><span>, r2: </span><span style=color:#8959a8>u8 </span><span>},
+</span><span>    </span><span style=color:#8e908c>// сдвиг регистра на значение
+</span><span>    SHR_v { r1: </span><span style=color:#8959a8>u8</span><span>, v1: </span><span style=color:#8959a8>u64 </span><span>},
+</span><span>    </span><span style=color:#8e908c>// безусловный переход к метку
+</span><span>    JMP { i: </span><span style=color:#8959a8>u8 </span><span>},
+</span><span>    </span><span style=color:#8e908c>// переход если #1 больше #2
+</span><span>    JG { i: </span><span style=color:#8959a8>u8 </span><span>},
+</span><span>    </span><span style=color:#8e908c>// переход если #1 меньше, либо равно #2
+</span><span>    JLE { i: </span><span style=color:#8959a8>u8 </span><span>},
+</span><span>    </span><span style=color:#8e908c>// переход если #1 не равно #2
+</span><span>    JNE { i: </span><span style=color:#8959a8>u8 </span><span>},
+</span><span>    </span><span style=color:#8e908c>// поместить в регистр значение другого регистра
+</span><span>    MOV_r { r1: </span><span style=color:#8959a8>u8</span><span>, r2: </span><span style=color:#8959a8>u8 </span><span>},
+</span><span>    </span><span style=color:#8e908c>// поместить в регистр значение
+</span><span>    MOV_v { r1: </span><span style=color:#8959a8>u8</span><span>, v1: </span><span style=color:#8959a8>u64 </span><span>},
+</span><span>    </span><span style=color:#8e908c>// сравнить два регистра
+</span><span>    CMP_r { r1: </span><span style=color:#8959a8>u8</span><span>, r2: </span><span style=color:#8959a8>u8 </span><span>},
+</span><span>    </span><span style=color:#8e908c>// сравнить регистр и значение
+</span><span>    CMP_v { r1: </span><span style=color:#8959a8>u8</span><span>, v1: </span><span style=color:#8959a8>u64 </span><span>},
+</span><span>    </span><span style=color:#8e908c>// распечатать содержимое регистра
+</span><span>    PRINT { r1: </span><span style=color:#8959a8>u8 </span><span>}
+</span><span>}
+</span></code></pre><p>Теперь остаётся только описать скелет программы<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>impl </span><span>VirtualMachine {
+</span><span>    </span><span style=color:#8e908c>// функция инициализации
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>new</span><span>() -> VirtualMachine {
+</span><span>        VirtualMachine {
+</span><span>            ip: </span><span style=color:#f07219>0</span><span>,
+</span><span>            reg: [</span><span style=color:#f07219>0_</span><span style=color:#8959a8>u64</span><span>; </span><span style=color:#f07219>8</span><span>],
+</span><span>            app: </span><span style=color:#c99e00>Vec</span><span>::new(),
+</span><span>            label: HashMap::new(),
+</span><span>            flags: [</span><span style=color:#f07219>false</span><span>; </span><span style=color:#f07219>2</span><span>]
+</span><span>        }
+</span><span>    }
+</span><span>    </span><span style=color:#8e908c>// функция преобразованеи кода в файле в набор инструкций
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>parse_code</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>filename</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>str</span><span>) {}
+</span><span>    </span><span style=color:#8e908c>// функция для запуска кода на выполнение
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>interp</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>) {}
+</span><span>}
+</span><span>
+</span><span style=color:#8959a8>fn </span><span style=color:#4271ae>main</span><span>() {
+</span><span>    </span><span style=color:#8959a8>let mut</span><span> vm </span><span style=color:#3e999f>= </span><span>VirtualMachine::new();
+</span><span>    vm.</span><span style=color:#4271ae>parse_code</span><span>(</span><span style=color:#839c00>"collatz.vm_asm"</span><span>);
+</span><span>    vm.</span><span style=color:#4271ae>interp</span><span>();
+</span><span>}
+</span></code></pre><p>Остаётся только реализовать два недостающих блока по парсингу и интерпретации кода.<p>Начнём с самой простой функции, а именно <code>interp</code>. Тут всё просто вытаскиваем инструкцию по <code>ip</code> из <code>app</code> и выполняем её, попутно увеличивая значение <code>ip</code>. После того как значение <code>ip</code> будет больше чем количества инструкций в <code>app</code> можно закончить выполнение.<p>В коде это выглядит вот так:<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>fn </span><span style=color:#4271ae>interp</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>) {
+</span><span>    </span><span style=color:#8959a8>while </span><span style=color:#c82728>self</span><span>.ip </span><span style=color:#3e999f>< </span><span style=color:#c82728>self</span><span>.app.</span><span style=color:#4271ae>len</span><span>() </span><span style=color:#3e999f>as </span><span style=color:#8959a8>u8 </span><span>{
+</span><span>        </span><span style=color:#8959a8>match </span><span style=color:#c82728>self</span><span>.app[</span><span style=color:#c82728>self</span><span>.ip </span><span style=color:#3e999f>as </span><span style=color:#8959a8>usize</span><span>] {
+</span><span>            </span><span style=color:#8e908c>// здесь будут инструкции
+</span><span>        }
+</span><span>        </span><span style=color:#c82728>self</span><span>.ip </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>    }
+</span><span>}
+</span></code></pre><p>А теперь к коду инструкций, которые очень просты в реализации<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span>Opcode::ADD_r { r1, r2 } </span><span style=color:#3e999f>=> </span><span>{
+</span><span>    </span><span style=color:#8e908c>// прибавляем к первому регистру второй
+</span><span>    </span><span style=color:#c82728>self</span><span>.reg[r1 </span><span style=color:#3e999f>as </span><span style=color:#8959a8>usize</span><span>] </span><span style=color:#3e999f>+= </span><span style=color:#c82728>self</span><span>.reg[r2 </span><span style=color:#3e999f>as </span><span style=color:#8959a8>usize</span><span>];
+</span><span>},
+</span><span>Opcode::ADD_v { r1, v1 } </span><span style=color:#3e999f>=> </span><span>{
+</span><span>    </span><span style=color:#8e908c>// прибавляем значение к регистру
+</span><span>    </span><span style=color:#c82728>self</span><span>.reg[r1 </span><span style=color:#3e999f>as </span><span style=color:#8959a8>usize</span><span>] </span><span style=color:#3e999f>+=</span><span> v1;
+</span><span>},
+</span><span>Opcode::INC { r1 } </span><span style=color:#3e999f>=> </span><span>{
+</span><span>    </span><span style=color:#8e908c>// инкремент
+</span><span>    </span><span style=color:#c82728>self</span><span>.reg[r1 </span><span style=color:#3e999f>as </span><span style=color:#8959a8>usize</span><span>] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>},
+</span><span>Opcode::MOD_r { r1, r2 } </span><span style=color:#3e999f>=> </span><span>{
+</span><span>    </span><span style=color:#8e908c>// деление по модулю регистр на регистр
+</span><span>    </span><span style=color:#c82728>self</span><span>.reg[r1 </span><span style=color:#3e999f>as </span><span style=color:#8959a8>usize</span><span>] </span><span style=color:#3e999f>%= </span><span style=color:#c82728>self</span><span>.reg[r2 </span><span style=color:#3e999f>as </span><span style=color:#8959a8>usize</span><span>];
+</span><span>},
+</span><span>Opcode::MOD_v { r1, v1 } </span><span style=color:#3e999f>=> </span><span>{
+</span><span>    </span><span style=color:#8e908c>// деление по модулю регистр на значение
+</span><span>    </span><span style=color:#c82728>self</span><span>.reg[r1 </span><span style=color:#3e999f>as </span><span style=color:#8959a8>usize</span><span>] </span><span style=color:#3e999f>%=</span><span> v1;
+</span><span>},
+</span><span>Opcode::MUL_r { r1, r2 } </span><span style=color:#3e999f>=> </span><span>{
+</span><span>    </span><span style=color:#8e908c>// умножение регистров
+</span><span>    </span><span style=color:#c82728>self</span><span>.reg[r1 </span><span style=color:#3e999f>as </span><span style=color:#8959a8>usize</span><span>] </span><span style=color:#3e999f>*= </span><span style=color:#c82728>self</span><span>.reg[r2 </span><span style=color:#3e999f>as </span><span style=color:#8959a8>usize</span><span>];
+</span><span>},
+</span><span>Opcode::MUL_v { r1, v1 } </span><span style=color:#3e999f>=> </span><span>{
+</span><span>    </span><span style=color:#8e908c>// умножение на значение
+</span><span>    </span><span style=color:#c82728>self</span><span>.reg[r1 </span><span style=color:#3e999f>as </span><span style=color:#8959a8>usize</span><span>] </span><span style=color:#3e999f>*=</span><span> v1;
+</span><span>},
+</span><span>Opcode::SHR_r { r1, r2 } </span><span style=color:#3e999f>=> </span><span>{
+</span><span>    </span><span style=color:#8e908c>// сдвиг на значение во втором регистре
+</span><span>    </span><span style=color:#c82728>self</span><span>.reg[r1 </span><span style=color:#3e999f>as </span><span style=color:#8959a8>usize</span><span>] </span><span style=color:#3e999f>>>= </span><span style=color:#c82728>self</span><span>.reg[r2 </span><span style=color:#3e999f>as </span><span style=color:#8959a8>usize</span><span>];
+</span><span>},
+</span><span>Opcode::SHR_v { r1, v1 } </span><span style=color:#3e999f>=> </span><span>{
+</span><span>    </span><span style=color:#8e908c>// сдвиг на значение
+</span><span>    </span><span style=color:#c82728>self</span><span>.reg[r1 </span><span style=color:#3e999f>as </span><span style=color:#8959a8>usize</span><span>] </span><span style=color:#3e999f>>>=</span><span> v1;
+</span><span>},
+</span><span>Opcode::JMP { i } </span><span style=color:#3e999f>=> </span><span>{
+</span><span>    </span><span style=color:#8e908c>// меняем значение ip и переходим к циклу, без увеличения ip
+</span><span>    </span><span style=color:#c82728>self</span><span>.ip </span><span style=color:#3e999f>=</span><span> i;
+</span><span>    </span><span style=color:#8959a8>continue</span><span>;
+</span><span>},
+</span><span>Opcode::JG { i } </span><span style=color:#3e999f>=> </span><span>{
+</span><span>    </span><span style=color:#8e908c>// если F1 равен true, то меняем ip
+</span><span>    </span><span style=color:#8959a8>if </span><span style=color:#c82728>self</span><span>.flags[</span><span style=color:#f07219>0</span><span>] {
+</span><span>        </span><span style=color:#c82728>self</span><span>.ip </span><span style=color:#3e999f>=</span><span> i;
+</span><span>        </span><span style=color:#8959a8>continue</span><span>;
+</span><span>    }
+</span><span>},
+</span><span>Opcode::JLE { i } </span><span style=color:#3e999f>=> </span><span>{
+</span><span>    </span><span style=color:#8e908c>// если F1 не равен true, то меняем ip
+</span><span>    </span><span style=color:#8959a8>if </span><span style=color:#3e999f>!</span><span style=color:#c82728>self</span><span>.flags[</span><span style=color:#f07219>0</span><span>] {
+</span><span>        </span><span style=color:#c82728>self</span><span>.ip </span><span style=color:#3e999f>=</span><span> i;
+</span><span>        </span><span style=color:#8959a8>continue</span><span>;
+</span><span>    }
+</span><span>}
+</span><span>Opcode::JNE { i } </span><span style=color:#3e999f>=> </span><span>{
+</span><span>    </span><span style=color:#8e908c>// если F2 равен true, то меняем ip
+</span><span>    </span><span style=color:#8959a8>if </span><span style=color:#c82728>self</span><span>.flags[</span><span style=color:#f07219>1</span><span>] {
+</span><span>        </span><span style=color:#c82728>self</span><span>.ip </span><span style=color:#3e999f>=</span><span> i;
+</span><span>        </span><span style=color:#8959a8>continue</span><span>;
+</span><span>    }
+</span><span>},
+</span><span>Opcode::MOV_r { r1, r2 } </span><span style=color:#3e999f>=> </span><span>{
+</span><span>    </span><span style=color:#8e908c>// значение второго регистра записываем в первый
+</span><span>    </span><span style=color:#c82728>self</span><span>.reg[r1 </span><span style=color:#3e999f>as </span><span style=color:#8959a8>usize</span><span>] </span><span style=color:#3e999f>= </span><span style=color:#c82728>self</span><span>.reg[r2 </span><span style=color:#3e999f>as </span><span style=color:#8959a8>usize</span><span>];
+</span><span>},
+</span><span>Opcode::MOV_v { r1, v1 } </span><span style=color:#3e999f>=> </span><span>{
+</span><span>    </span><span style=color:#8e908c>// записываем значение в регистр
+</span><span>    </span><span style=color:#c82728>self</span><span>.reg[r1 </span><span style=color:#3e999f>as </span><span style=color:#8959a8>usize</span><span>] </span><span style=color:#3e999f>=</span><span> v1;
+</span><span>},
+</span><span>Opcode::CMP_r { r1, r2 } </span><span style=color:#3e999f>=> </span><span>{
+</span><span>    </span><span style=color:#8e908c>// получаем значения в регистрах
+</span><span>    </span><span style=color:#8959a8>let </span><span>(v1, v2) </span><span style=color:#3e999f>= </span><span>(</span><span style=color:#c82728>self</span><span>.reg[r1 </span><span style=color:#3e999f>as </span><span style=color:#8959a8>usize</span><span>], </span><span style=color:#c82728>self</span><span>.reg[r2 </span><span style=color:#3e999f>as </span><span style=color:#8959a8>usize</span><span>]);
+</span><span>    </span><span style=color:#8e908c>// и устанавливаем флаги в соответствии с ранее описанными условиями
+</span><span>    </span><span style=color:#c82728>self</span><span>.flags[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>= </span><span style=color:#8959a8>if</span><span> v1 </span><span style=color:#3e999f>></span><span> v2 { </span><span style=color:#f07219>true </span><span>} </span><span style=color:#8959a8>else </span><span>{ </span><span style=color:#f07219>false </span><span>};
+</span><span>    </span><span style=color:#c82728>self</span><span>.flags[</span><span style=color:#f07219>1</span><span>] </span><span style=color:#3e999f>= </span><span style=color:#8959a8>if</span><span> v1 </span><span style=color:#3e999f>!=</span><span> v2 { </span><span style=color:#f07219>true </span><span>} </span><span style=color:#8959a8>else </span><span>{ </span><span style=color:#f07219>false </span><span>};
+</span><span>},
+</span><span>Opcode::CMP_v { r1, v1 } </span><span style=color:#3e999f>=> </span><span>{
+</span><span>    </span><span style=color:#8e908c>// тоже самое, но только второй операнд -- число
+</span><span>    </span><span style=color:#8959a8>let</span><span> v0 </span><span style=color:#3e999f>= </span><span style=color:#c82728>self</span><span>.reg[r1 </span><span style=color:#3e999f>as </span><span style=color:#8959a8>usize</span><span>];
+</span><span>    </span><span style=color:#c82728>self</span><span>.flags[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>= </span><span style=color:#8959a8>if</span><span> v0 </span><span style=color:#3e999f>></span><span> v1 { </span><span style=color:#f07219>true </span><span>} </span><span style=color:#8959a8>else </span><span>{ </span><span style=color:#f07219>false </span><span>};
+</span><span>    </span><span style=color:#c82728>self</span><span>.flags[</span><span style=color:#f07219>1</span><span>] </span><span style=color:#3e999f>= </span><span style=color:#8959a8>if</span><span> v0 </span><span style=color:#3e999f>!=</span><span> v1 { </span><span style=color:#f07219>true </span><span>} </span><span style=color:#8959a8>else </span><span>{ </span><span style=color:#f07219>false </span><span>};
+</span><span>},
+</span><span>Opcode::PRINT { r1 } </span><span style=color:#3e999f>=> </span><span>{
+</span><span>    </span><span style=color:#8e908c>// вывод на печать значение регистра
+</span><span>    </span><span style=color:#8959a8>let</span><span> v1 </span><span style=color:#3e999f>= </span><span style=color:#c82728>self</span><span>.reg[r1 </span><span style=color:#3e999f>as </span><span style=color:#8959a8>usize</span><span>];
+</span><span>    println!(</span><span style=color:#839c00>"</span><span>{}</span><span style=color:#839c00>"</span><span>, v1);
+</span><span>}
+</span></code></pre><p>Остаётся парсинг кода, который я разбил на несколько шагов:<ul><li>чтение всего файла<li>парсинг меток для реализации переходов<li>парсинг основного кода</ul><p>Чтение файла и разбор на отдельные блоки реализуется в пару строк<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8e908c>// чтения всего файла в строку
+</span><span style=color:#8959a8>let mut</span><span> f </span><span style=color:#3e999f>= </span><span>File::open(filename).</span><span style=color:#4271ae>unwrap</span><span>();
+</span><span style=color:#8959a8>let mut</span><span> buffer </span><span style=color:#3e999f>= </span><span style=color:#c99e00>String</span><span>::new();
+</span><span>f.</span><span style=color:#4271ae>read_to_string</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut</span><span> buffer).</span><span style=color:#4271ae>unwrap</span><span>();
+</span><span style=color:#8e908c>// разбор на инструкции
+</span><span style=color:#8959a8>let</span><span> instr: </span><span style=color:#c99e00>Vec</span><span><</span><span style=color:#3e999f>&</span><span style=color:#8959a8>str</span><span>> </span><span style=color:#3e999f>=</span><span> buffer.</span><span style=color:#4271ae>split</span><span>(</span><span style=color:#839c00>'</span><span style=color:#f07219>\n</span><span style=color:#839c00>'</span><span>)
+</span><span>                             </span><span style=color:#8e908c>// разделение строк по переносам
+</span><span>                             .</span><span style=color:#4271ae>map</span><span>(|</span><span style=color:#f07219>x</span><span>| x.</span><span style=color:#4271ae>trim</span><span>())
+</span><span>                             </span><span style=color:#8e908c>// убираем начальные и конечные пробелы в строке
+</span><span>                             .</span><span style=color:#4271ae>filter</span><span>(|</span><span style=color:#f07219>x</span><span>| </span><span style=color:#3e999f>!</span><span>x.</span><span style=color:#4271ae>starts_with</span><span>(</span><span style=color:#839c00>'#'</span><span>) </span><span style=color:#3e999f>&&</span><span> x.</span><span style=color:#4271ae>len</span><span>() </span><span style=color:#3e999f>> </span><span style=color:#f07219>3</span><span>)
+</span><span>                             </span><span style=color:#8e908c>// убираем строки с комментариями
+</span><span>                             .</span><span style=color:#4271ae>collect</span><span>();
+</span><span>                             </span><span style=color:#8e908c>// сбор значений в вектор
+</span></code></pre><p>Далее проходимся по списку инструкций и вычленяем из него метки<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>for </span><span>(index, item) </span><span style=color:#3e999f>in</span><span> instr.</span><span style=color:#4271ae>iter</span><span>().</span><span style=color:#4271ae>enumerate</span><span>() {
+</span><span>    </span><span style=color:#8e908c>// наши метки начинаются с символа '_'
+</span><span>    </span><span style=color:#8959a8>if</span><span> item.</span><span style=color:#4271ae>starts_with</span><span>(</span><span style=color:#839c00>'_'</span><span>) {
+</span><span>        </span><span style=color:#8e908c>// номер строки определяем из индекса текущей строк минус количество уже определенных меток
+</span><span>        </span><span style=color:#8959a8>let</span><span> label_index </span><span style=color:#3e999f>=</span><span> index </span><span style=color:#3e999f>as </span><span style=color:#8959a8>u8 </span><span style=color:#3e999f>- </span><span style=color:#c82728>self</span><span>.label.</span><span style=color:#4271ae>len</span><span>() </span><span style=color:#3e999f>as </span><span style=color:#8959a8>u8</span><span>;
+</span><span>        </span><span style=color:#8e908c>// добавляем в хэшмап имя метки и номер строки для перехода
+</span><span>        </span><span style=color:#c82728>self</span><span>.label.</span><span style=color:#4271ae>insert</span><span>(item[</span><span style=color:#3e999f>..</span><span>item.</span><span style=color:#4271ae>len</span><span>() </span><span style=color:#3e999f>- </span><span style=color:#f07219>1</span><span>].</span><span style=color:#4271ae>to_string</span><span>(), label_index);
+</span><span>    }
+</span><span>}
+</span></code></pre><p>Осталось только преобразовать строковое представление инструкции в <code>Opcode</code>, но перед этим нужно определить пару вспомогательных функций<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8e908c>// функция проверяющая аргумент на принадлежность к регистру процессора
+</span><span style=color:#8959a8>fn </span><span style=color:#4271ae>is_register</span><span>(</span><span style=color:#f07219>s</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>str</span><span>) -> </span><span style=color:#8959a8>bool </span><span>{
+</span><span>    s.</span><span style=color:#4271ae>starts_with</span><span>(</span><span style=color:#839c00>'r'</span><span>)
+</span><span>}
+</span><span>
+</span><span style=color:#8e908c>// получение индекса регистра из строки
+</span><span style=color:#8959a8>fn </span><span style=color:#4271ae>parse_register</span><span>(</span><span style=color:#f07219>s</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>str</span><span>) -> </span><span style=color:#8959a8>u8 </span><span>{
+</span><span>    s[</span><span style=color:#f07219>1</span><span style=color:#3e999f>..</span><span>].</span><span style=color:#4271ae>parse</span><span>().</span><span style=color:#4271ae>unwrap</span><span>()
+</span><span>}
+</span><span>
+</span><span style=color:#8e908c>// получение значения из строки
+</span><span style=color:#8959a8>fn </span><span style=color:#4271ae>parse_value</span><span>(</span><span style=color:#f07219>s</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>str</span><span>) -> </span><span style=color:#8959a8>u64 </span><span>{
+</span><span>    s.</span><span style=color:#4271ae>parse</span><span>().</span><span style=color:#4271ae>unwrap</span><span>()
+</span><span>}
+</span></code></pre><p>Ну и собственно парсинг инструкций<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>for</span><span> item </span><span style=color:#3e999f>in</span><span> instr {
+</span><span>    </span><span style=color:#8e908c>// обрабатываем все строки, кроме меток
+</span><span>    </span><span style=color:#8959a8>if </span><span style=color:#3e999f>!</span><span>item.</span><span style=color:#4271ae>starts_with</span><span>(</span><span style=color:#839c00>'_'</span><span>) {
+</span><span>        </span><span style=color:#8e908c>// разбиваем строку по двум разделителям (' ' и ',') и отбрасываем пустые
+</span><span>        </span><span style=color:#8959a8>let</span><span> block: </span><span style=color:#c99e00>Vec</span><span><</span><span style=color:#3e999f>&</span><span style=color:#8959a8>str</span><span>> </span><span style=color:#3e999f>=</span><span> item.</span><span style=color:#4271ae>split</span><span>(|</span><span style=color:#f07219>c</span><span>| c </span><span style=color:#3e999f>== </span><span style=color:#839c00>' ' </span><span style=color:#3e999f>||</span><span> c </span><span style=color:#3e999f>== </span><span style=color:#839c00>','</span><span>)
+</span><span>                                   .</span><span style=color:#4271ae>filter</span><span>(|</span><span style=color:#f07219>c</span><span>| c.</span><span style=color:#4271ae>len</span><span>() </span><span style=color:#3e999f>> </span><span style=color:#f07219>0</span><span>)
+</span><span>                                   .</span><span style=color:#4271ae>collect</span><span>();
+</span><span>        </span><span style=color:#8e908c>// используем Slice pattern, чтобы разобрать список об образцу
+</span><span>        </span><span style=color:#8959a8>let</span><span> cmd </span><span style=color:#3e999f>= </span><span style=color:#8959a8>match </span><span style=color:#3e999f>&</span><span>block[</span><span style=color:#3e999f>..</span><span>] {
+</span><span>            </span><span style=color:#8e908c>// инструкция сложения
+</span><span>            </span><span style=color:#3e999f>&</span><span>[</span><span style=color:#839c00>"add"</span><span>, arg1, arg2] </span><span style=color:#3e999f>=> </span><span>{
+</span><span>                </span><span style=color:#8959a8>match </span><span>(</span><span style=color:#4271ae>is_register</span><span>(arg1), </span><span style=color:#4271ae>is_register</span><span>(arg2)) {
+</span><span>                    </span><span style=color:#8e908c>// оба значения регистры
+</span><span>                    (</span><span style=color:#f07219>true</span><span>, </span><span style=color:#f07219>true</span><span>) </span><span style=color:#3e999f>=> </span><span>Opcode::ADD_r { r1: </span><span style=color:#4271ae>parse_register</span><span>(arg1), r2: </span><span style=color:#4271ae>parse_register</span><span>(arg2) },
+</span><span>                    </span><span style=color:#8e908c>// второе параметр является числом
+</span><span>                    (</span><span style=color:#f07219>true</span><span>, </span><span style=color:#f07219>false</span><span>) </span><span style=color:#3e999f>=> </span><span>Opcode::ADD_v { r1: </span><span style=color:#4271ae>parse_register</span><span>(arg1), v1: </span><span style=color:#4271ae>parse_value</span><span>(arg2) },
+</span><span>                    </span><span style=color:#8e908c>// в любых других случаях кидаем ошибку
+</span><span>                    </span><span style=color:#3e999f>_ => </span><span>panic!(</span><span style=color:#839c00>"not valid arguments `{}, {}` for ADD"</span><span>, arg1, arg2)
+</span><span>                }
+</span><span>            }
+</span><span>            </span><span style=color:#8e908c>// инкремент
+</span><span>            </span><span style=color:#3e999f>&</span><span>[</span><span style=color:#839c00>"inc"</span><span>, arg1] </span><span style=color:#3e999f>=> </span><span>{
+</span><span>                </span><span style=color:#8959a8>if </span><span style=color:#4271ae>is_register</span><span>(arg1) {
+</span><span>                    Opcode::INC { r1: </span><span style=color:#4271ae>parse_register</span><span>(arg1) }
+</span><span>                } </span><span style=color:#8959a8>else </span><span>{
+</span><span>                    panic!(</span><span style=color:#839c00>"not valid argument `{}` for INC"</span><span>, arg1);
+</span><span>                }
+</span><span>            }
+</span><span>            </span><span style=color:#8e908c>// деление по модулю
+</span><span>            </span><span style=color:#3e999f>&</span><span>[</span><span style=color:#839c00>"mod"</span><span>, arg1, arg2] </span><span style=color:#3e999f>=> </span><span>{
+</span><span>                </span><span style=color:#8959a8>match </span><span>(</span><span style=color:#4271ae>is_register</span><span>(arg1), </span><span style=color:#4271ae>is_register</span><span>(arg2)) {
+</span><span>                    (</span><span style=color:#f07219>true</span><span>, </span><span style=color:#f07219>true</span><span>) </span><span style=color:#3e999f>=> </span><span>Opcode::MOD_r { r1: </span><span style=color:#4271ae>parse_register</span><span>(arg1), r2: </span><span style=color:#4271ae>parse_register</span><span>(arg2) },
+</span><span>                    (</span><span style=color:#f07219>true</span><span>, </span><span style=color:#f07219>false</span><span>) </span><span style=color:#3e999f>=> </span><span>Opcode::MOD_v { r1: </span><span style=color:#4271ae>parse_register</span><span>(arg1), v1: </span><span style=color:#4271ae>parse_value</span><span>(arg2) },
+</span><span>                    </span><span style=color:#3e999f>_ => </span><span>panic!(</span><span style=color:#839c00>"not valid arguments `{}, {}` for MOD"</span><span>, arg1, arg2)
+</span><span>                }
+</span><span>            }
+</span><span>            </span><span style=color:#8e908c>// умножение
+</span><span>            </span><span style=color:#3e999f>&</span><span>[</span><span style=color:#839c00>"mul"</span><span>, arg1, arg2] </span><span style=color:#3e999f>=> </span><span>{
+</span><span>                </span><span style=color:#8959a8>match </span><span>(</span><span style=color:#4271ae>is_register</span><span>(arg1), </span><span style=color:#4271ae>is_register</span><span>(arg2)) {
+</span><span>                    (</span><span style=color:#f07219>true</span><span>, </span><span style=color:#f07219>true</span><span>) </span><span style=color:#3e999f>=> </span><span>Opcode::MUL_r { r1: </span><span style=color:#4271ae>parse_register</span><span>(arg1), r2: </span><span style=color:#4271ae>parse_register</span><span>(arg2) },
+</span><span>                    (</span><span style=color:#f07219>true</span><span>, </span><span style=color:#f07219>false</span><span>) </span><span style=color:#3e999f>=> </span><span>Opcode::MUL_v { r1: </span><span style=color:#4271ae>parse_register</span><span>(arg1), v1: </span><span style=color:#4271ae>parse_value</span><span>(arg2) },
+</span><span>                    </span><span style=color:#3e999f>_ => </span><span>panic!(</span><span style=color:#839c00>"not valid arguments `{}, {}` for MUL"</span><span>, arg1, arg2)
+</span><span>                }
+</span><span>            }
+</span><span>            </span><span style=color:#8e908c>// логический сдвиг вправо
+</span><span>            </span><span style=color:#3e999f>&</span><span>[</span><span style=color:#839c00>"shr"</span><span>, arg1, arg2] </span><span style=color:#3e999f>=> </span><span>{
+</span><span>                </span><span style=color:#8959a8>match </span><span>(</span><span style=color:#4271ae>is_register</span><span>(arg1), </span><span style=color:#4271ae>is_register</span><span>(arg2)) {
+</span><span>                    (</span><span style=color:#f07219>true</span><span>, </span><span style=color:#f07219>true</span><span>) </span><span style=color:#3e999f>=> </span><span>Opcode::SHR_r { r1: </span><span style=color:#4271ae>parse_register</span><span>(arg1), r2: </span><span style=color:#4271ae>parse_register</span><span>(arg2) },
+</span><span>                    (</span><span style=color:#f07219>true</span><span>, </span><span style=color:#f07219>false</span><span>) </span><span style=color:#3e999f>=> </span><span>Opcode::SHR_v { r1: </span><span style=color:#4271ae>parse_register</span><span>(arg1), v1: </span><span style=color:#4271ae>parse_value</span><span>(arg2) },
+</span><span>                    </span><span style=color:#3e999f>_ => </span><span>panic!(</span><span style=color:#839c00>"not valid arguments `{}, {}` for SHR"</span><span>, arg1, arg2)
+</span><span>                }
+</span><span>            }
+</span><span>            </span><span style=color:#8e908c>// безусловный переход
+</span><span>            </span><span style=color:#3e999f>&</span><span>[</span><span style=color:#839c00>"jmp"</span><span>, arg1] </span><span style=color:#3e999f>=> </span><span>{
+</span><span>                </span><span style=color:#8e908c>// проверяем на существование метки
+</span><span>                </span><span style=color:#8959a8>match </span><span style=color:#c82728>self</span><span>.label.</span><span style=color:#4271ae>get</span><span>(arg1) {
+</span><span>                    </span><span style=color:#8e908c>// формируем команду перехода к метке, если она есть
+</span><span>                    </span><span style=color:#c99e00>Some</span><span>(value) </span><span style=color:#3e999f>=> </span><span>Opcode::JMP { i: </span><span style=color:#3e999f>*</span><span>value },
+</span><span>                    </span><span style=color:#8e908c>// иначе -- ошибка
+</span><span>                    </span><span style=color:#c99e00>None </span><span style=color:#3e999f>=> </span><span>panic!(</span><span style=color:#839c00>"label `{}` not found!"</span><span>, arg1)
+</span><span>                }
+</span><span>            }
+</span><span>            </span><span style=color:#8e908c>// переход если больше
+</span><span>            </span><span style=color:#3e999f>&</span><span>[</span><span style=color:#839c00>"jg"</span><span>, arg1] </span><span style=color:#3e999f>=> </span><span>{
+</span><span>                </span><span style=color:#8959a8>match </span><span style=color:#c82728>self</span><span>.label.</span><span style=color:#4271ae>get</span><span>(arg1) {
+</span><span>                    </span><span style=color:#c99e00>Some</span><span>(value) </span><span style=color:#3e999f>=> </span><span>Opcode::JG { i: </span><span style=color:#3e999f>*</span><span>value },
+</span><span>                    </span><span style=color:#c99e00>None </span><span style=color:#3e999f>=> </span><span>panic!(</span><span style=color:#839c00>"label `{}` not found!"</span><span>, arg1)
+</span><span>                }
+</span><span>            }
+</span><span>            </span><span style=color:#8e908c>// переход при меньше, либо равно
+</span><span>            </span><span style=color:#3e999f>&</span><span>[</span><span style=color:#839c00>"jle"</span><span>, arg1] </span><span style=color:#3e999f>=> </span><span>{
+</span><span>                </span><span style=color:#8959a8>match </span><span style=color:#c82728>self</span><span>.label.</span><span style=color:#4271ae>get</span><span>(arg1) {
+</span><span>                    </span><span style=color:#c99e00>Some</span><span>(value) </span><span style=color:#3e999f>=> </span><span>Opcode::JLE { i: </span><span style=color:#3e999f>*</span><span>value },
+</span><span>                    </span><span style=color:#c99e00>None </span><span style=color:#3e999f>=> </span><span>panic!(</span><span style=color:#839c00>"label `{}` not found!"</span><span>, arg1)
+</span><span>                }
+</span><span>            }
+</span><span>            </span><span style=color:#8e908c>// переход если не равно
+</span><span>            </span><span style=color:#3e999f>&</span><span>[</span><span style=color:#839c00>"jne"</span><span>, arg1] </span><span style=color:#3e999f>=> </span><span>{
+</span><span>                </span><span style=color:#8959a8>match </span><span style=color:#c82728>self</span><span>.label.</span><span style=color:#4271ae>get</span><span>(arg1) {
+</span><span>                    </span><span style=color:#c99e00>Some</span><span>(value) </span><span style=color:#3e999f>=> </span><span>Opcode::JNE { i: </span><span style=color:#3e999f>*</span><span>value },
+</span><span>                    </span><span style=color:#c99e00>None </span><span style=color:#3e999f>=> </span><span>panic!(</span><span style=color:#839c00>"label `{}` not found!"</span><span>, arg1)
+</span><span>                }
+</span><span>            }
+</span><span>            </span><span style=color:#8e908c>// копирование
+</span><span>            </span><span style=color:#3e999f>&</span><span>[</span><span style=color:#839c00>"mov"</span><span>, arg1, arg2] </span><span style=color:#3e999f>=> </span><span>{
+</span><span>                </span><span style=color:#8959a8>match </span><span>(</span><span style=color:#4271ae>is_register</span><span>(arg1), </span><span style=color:#4271ae>is_register</span><span>(arg2)) {
+</span><span>                    (</span><span style=color:#f07219>true</span><span>, </span><span style=color:#f07219>true</span><span>) </span><span style=color:#3e999f>=> </span><span>Opcode::MOV_r { r1: </span><span style=color:#4271ae>parse_register</span><span>(arg1), r2: </span><span style=color:#4271ae>parse_register</span><span>(arg2) },
+</span><span>                    (</span><span style=color:#f07219>true</span><span>, </span><span style=color:#f07219>false</span><span>) </span><span style=color:#3e999f>=> </span><span>Opcode::MOV_v { r1: </span><span style=color:#4271ae>parse_register</span><span>(arg1), v1: </span><span style=color:#4271ae>parse_value</span><span>(arg2) },
+</span><span>                    </span><span style=color:#3e999f>_ => </span><span>panic!(</span><span style=color:#839c00>"not valid arguments `{}, {}` for MOV"</span><span>, arg1, arg2)
+</span><span>                }
+</span><span>            }
+</span><span>            </span><span style=color:#8e908c>// сравнение
+</span><span>            </span><span style=color:#3e999f>&</span><span>[</span><span style=color:#839c00>"cmp"</span><span>, arg1, arg2] </span><span style=color:#3e999f>=> </span><span>{
+</span><span>                </span><span style=color:#8959a8>match </span><span>(</span><span style=color:#4271ae>is_register</span><span>(arg1), </span><span style=color:#4271ae>is_register</span><span>(arg2)) {
+</span><span>                    (</span><span style=color:#f07219>true</span><span>, </span><span style=color:#f07219>true</span><span>) </span><span style=color:#3e999f>=> </span><span>Opcode::CMP_r { r1: </span><span style=color:#4271ae>parse_register</span><span>(arg1), r2: </span><span style=color:#4271ae>parse_register</span><span>(arg2) },
+</span><span>                    (</span><span style=color:#f07219>true</span><span>, </span><span style=color:#f07219>false</span><span>) </span><span style=color:#3e999f>=> </span><span>Opcode::CMP_v { r1: </span><span style=color:#4271ae>parse_register</span><span>(arg1), v1: </span><span style=color:#4271ae>parse_value</span><span>(arg2) },
+</span><span>                    </span><span style=color:#3e999f>_ => </span><span>panic!(</span><span style=color:#839c00>"not valid arguments `{}, {}` for CMP"</span><span>, arg1, arg2)
+</span><span>                }
+</span><span>            }
+</span><span>            </span><span style=color:#8e908c>// печать
+</span><span>            </span><span style=color:#3e999f>&</span><span>[</span><span style=color:#839c00>"print"</span><span>, arg1] </span><span style=color:#3e999f>=> </span><span>{
+</span><span>                </span><span style=color:#8959a8>if </span><span style=color:#4271ae>is_register</span><span>(arg1) {
+</span><span>                    Opcode::PRINT { r1: </span><span style=color:#4271ae>parse_register</span><span>(arg1) }
+</span><span>                } </span><span style=color:#8959a8>else </span><span>{
+</span><span>                    panic!(</span><span style=color:#839c00>"not valid argument `{}` for PRINT"</span><span>, arg1);
+</span><span>                }
+</span><span>            }
+</span><span>            </span><span style=color:#8e908c>// при любых других пишем о ошибке
+</span><span>            value </span><span style=color:#3e999f>=> </span><span>{
+</span><span>                panic!(</span><span style=color:#839c00>"unknown cmd `{:?}`"</span><span>, value)
+</span><span>            }
+</span><span>        };
+</span><span>        </span><span style=color:#8e908c>// добавляем распарсенную команду
+</span><span>        </span><span style=color:#c82728>self</span><span>.app.</span><span style=color:#4271ae>push</span><span>(cmd);
+</span><span>    }
+</span><span>}
+</span></code></pre><p>Вот и всё, наш интерпретатор готов, теперь можно перейти к тестам!<h1 id=testy>Тесты</h1><p>На моей машине с процессором i5-8265U примеры выполняются за следующее время:<ul><li>rust: 176ms<li>python: 9.83s<li>vm_asm: 2.80s</ul><p>В идеале нужно было произвести как минимум запусков по 10 для каждого примера и взять среднее, но это же не исследовательская работа!<p>Мы здесь чисто по фану собрались, а те кто хочет всегда смогут сами его провести.<h1 id=zakliuchenie>Заключение</h1><p>Вот так просто и незатейливо можно написать самую простой регистровый интерпретатор кода.<p>Весь исходный код доступен по <a href=https://gist.github.com/FreeCX/a1ebe513ee69329dc790a713d1f4e8f4>ссылке</a><p>На этом сегодня всё, увидимся ещё через пару лет!<h1 id=poleznye-ssylki>Полезные ссылки</h1><ol><li><a href=https://habr.com/ru/post/434138/>Пишем собственную виртуальную машину</a><li><a href=https://habr.com/ru/company/badoo/blog/425325/>Интерпретаторы байт-кодов своими руками</a><li><a href=https://ps-group.github.io/compilers/stack_and_register>Стековые и регистровые машины</a><li><a href=https://ru.wikipedia.org/wiki/%D0%93%D0%B8%D0%BF%D0%BE%D1%82%D0%B5%D0%B7%D0%B0_%D0%9A%D0%BE%D0%BB%D0%BB%D0%B0%D1%82%D1%86%D0%B0>Гипотеза Коллатца</a><li><a href=https://ru.wikipedia.org/wiki/%D0%A0%D0%B5%D0%B3%D0%B8%D1%81%D1%82%D1%80_%D1%84%D0%BB%D0%B0%D0%B3%D0%BE%D0%B2>Регистр флагов</a></ol></article><div class=back><a href=https://freecx.github.io/>Назад</a></div><div class=footer><span>Также читайте <a title="ты сам сломал ссылку, так что ничего личного" href=https://antoniii.github.io/> <s>antoniii</s> </a> <a href=https://citrux.github.io/>citrux</a> <a href=https://sputnikas.github.io/>sputnikas</a> </span></div><script>let msg=` А спонсор статей в моём блоге -- моя лень -- спонсор статей.`;[`=`.repeat(msg.length+ 1),msg,`=`.repeat(msg.length+ 1)].forEach(a=>console.warn(a))</script>

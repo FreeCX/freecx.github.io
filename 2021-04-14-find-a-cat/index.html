@@ -1,0 +1,194 @@
+<!doctype html><html lang=ru><head><meta charset=utf-8><meta content="IE=edge" http-equiv=X-UA-Compatible><meta content="width=device-width,initial-scale=1" name=viewport><title>Найди кота</title><meta content="Кодерный понедельник" name=description><meta content=https://freecx.github.io/touch-icon.png property=og:image><link href=https://code.cdn.mozilla.net/fonts/fira.css rel=stylesheet><link href=https://freecx.github.io/favicon.png rel=icon><link href=https://freecx.github.io/touch-icon.png rel=apple-touch-icon><link href=https://freecx.github.io/main.css rel=stylesheet><link href=https://freecx.github.io/syntax.css rel=stylesheet><body><aside class=logo><a href=https://github.com/FreeCX> <img class=gravatar src=https://freecx.github.io/avatar.png> </a><span class=logo-prompt>Я на github</span></aside><article><div class=center><h1>Найди кота</h1><time>14 April 2021</time></div><div class=divider></div><p>Всем привет!<p>Сегодня будет довольно странный пост — мы будем искать слово 'cat'.<p>Устраивайтесь поудобнее и погнали!<h1 id=chto-za>Что за?</h1><p>Недавно мне пришла очень странная идея — найти в последовательности псевдослучайных чисел некое заданное слово.<p>Сначала я думал найти что-то типа 'hello world', но сразу отказался от него, т.к. чем длиннее фраза, тем меньше вероятность найти её.<p>И решил остановится на более коротком — 'cat'.<h1 id=zadachi>Задачи</h1><p>Давайте сформулируем задачу:<ul><li>найти такой <code>seed</code>, который будет давать слово 'cat' после последовательного применения функции <code>rand</code>, т.е.</ul><pre style=color:#111;background-color:#f9f9f9><code><span>N1 = rand(seed)
+</span><span>N2 = rand(N1)
+</span><span>N3 = rand(N2)
+</span><span>N1 % 255 = 'c'
+</span><span>N2 % 255 = 'a'
+</span><span>N3 % 255 = 't'
+</span></code></pre><p>Чтобы не было скучно решать только одну задача мне ещё подкинули найти кота в <a href=https://en.wikipedia.org/wiki/SHA-2>sha256</a> (хотя можно взять и любую другую хеш функцию).<p>Сформулируем и для неё задачу:<ul><li>найти такую строку, после применения к которой операции хеширования можно найти в полученном хеше слово 'cat'</ul><h1 id=kot-v-sluchainykh-chislakh>Кот в случайных числах</h1><p>В данном примере будем использовать <a href=https://en.wikipedia.org/wiki/Xorshift>xor shift</a> для генерации псевдослучайных чисел<pre class=language-c++ data-lang=c++ style=color:#111;background-color:#f9f9f9><code class=language-c++ data-lang=c++><span style=color:#8e908c>// xorshift.hpp
+</span><span style=color:#c99e00>uint32_t </span><span style=color:#4271ae>xorshift</span><span>(</span><span style=color:#c99e00>uint32_t </span><span style=color:#f07219>seed</span><span>) {
+</span><span>    seed </span><span style=color:#3e999f>^=</span><span> seed </span><span style=color:#3e999f><< </span><span style=color:#f07219>13</span><span>;
+</span><span>    seed </span><span style=color:#3e999f>^=</span><span> seed </span><span style=color:#3e999f>>> </span><span style=color:#f07219>17</span><span>;
+</span><span>    seed </span><span style=color:#3e999f>^=</span><span> seed </span><span style=color:#3e999f><< </span><span style=color:#f07219>5</span><span>;
+</span><span>    </span><span style=color:#8959a8>return</span><span> seed;
+</span><span>}
+</span></code></pre><p>В качестве основного триплета я взял самый часто используемый: <code>[13, 17, 5]</code>.<p>С ним точно будем уверены что период генерации будет <code>2 ^ 32 - 1</code>, т.е. самый худший случай для перебора составит <code>4_294_967_295</code> итераций.<p>Если хотите подробнее погрузиться в теорию, то читайте <a href=https://en.wikipedia.org/wiki/Xorshift>вики</a> и <a href=https://www.jstatsoft.org/article/view/v008i14>статью Xorshift RNGs</a>.<h2 id=utilita-dlia-proverki>Утилита для проверки</h2><p>Для начала нам нужна утилита, с помощью которой сможем проверить любой заданный начальный <code>seed</code>.<pre class=language-c++ data-lang=c++ style=color:#111;background-color:#f9f9f9><code class=language-c++ data-lang=c++><span style=color:#8959a8>#include </span><span style=color:#839c00>&LTiostream>
+</span><span>
+</span><span style=color:#8959a8>#include </span><span style=color:#839c00>"xorshift.hpp"
+</span><span>
+</span><span style=color:#8959a8>int </span><span style=color:#4271ae>main</span><span>(</span><span style=color:#8959a8>int </span><span style=color:#f07219>argc</span><span>, </span><span style=color:#8959a8>char </span><span style=color:#3e999f>**</span><span style=color:#f07219>argv</span><span>) {
+</span><span>    </span><span style=color:#8959a8>if </span><span>(argc </span><span style=color:#3e999f>< </span><span style=color:#f07219>3</span><span>) {
+</span><span>        std::cout </span><span style=color:#3e999f><< </span><span style=color:#839c00>"usage: " </span><span style=color:#3e999f><<</span><span> argv[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f><< </span><span style=color:#839c00>" seed count" </span><span style=color:#3e999f><<</span><span> std::endl;
+</span><span>        </span><span style=color:#8959a8>return </span><span style=color:#f07219>0</span><span>;
+</span><span>    }
+</span><span>
+</span><span>    </span><span style=color:#8e908c>// получаем seed из первого аргумента
+</span><span>    </span><span style=color:#c99e00>uint32_t</span><span> seed </span><span style=color:#3e999f>= </span><span style=color:#4271ae>atoi(argv[</span><span style=color:#f07219>1</span><span style=color:#4271ae>])</span><span>;
+</span><span>    </span><span style=color:#8e908c>// и длину цепочки
+</span><span>    </span><span style=color:#c99e00>uint32_t</span><span> count </span><span style=color:#3e999f>= </span><span style=color:#4271ae>atoi(argv[</span><span style=color:#f07219>2</span><span style=color:#4271ae>])</span><span>;
+</span><span>
+</span><span>    </span><span style=color:#8e908c>// генерируем результат
+</span><span>    std::cout </span><span style=color:#3e999f><< </span><span style=color:#839c00>"result: "</span><span>;
+</span><span>    </span><span style=color:#8959a8>while </span><span>(count</span><span style=color:#3e999f>--</span><span>) {
+</span><span>        seed </span><span style=color:#3e999f>= </span><span style=color:#c82728>xorshift</span><span style=color:#4271ae>(seed)</span><span>;
+</span><span>        std::cout </span><span style=color:#3e999f><< </span><span style=color:#8959a8>char</span><span>(seed </span><span style=color:#3e999f>% </span><span style=color:#f07219>255</span><span>);
+</span><span>    }
+</span><span>    std::cout </span><span style=color:#3e999f><<</span><span> std::endl;
+</span><span>}
+</span></code></pre><h2 id=naivnyi-algoritm>Наивный алгоритм</h2><p>Суть наивного алгоритма — простой перебор.<p>То есть берём какое-то начальное число <code>seed</code> и начинаем искать последовательность чисел, которые по модулю <code>255</code> будут давать слово 'cat'.<p>В коде его можно представить как-то так:<pre class=language-c++ data-lang=c++ style=color:#111;background-color:#f9f9f9><code class=language-c++ data-lang=c++><span style=color:#8959a8>#include </span><span style=color:#839c00>&LTiostream>
+</span><span style=color:#8959a8>#include </span><span style=color:#839c00>&LTstring>
+</span><span>
+</span><span style=color:#8959a8>#include </span><span style=color:#839c00>"xorshift.hpp"
+</span><span>
+</span><span style=color:#8e908c>// условие на нахождение кота
+</span><span style=color:#8959a8>bool </span><span style=color:#4271ae>is_cat</span><span>(</span><span style=color:#8959a8>const</span><span> std::string </span><span style=color:#3e999f>& </span><span style=color:#f07219>word</span><span>) {
+</span><span>    </span><span style=color:#8959a8>if </span><span>(word.</span><span style=color:#c82728>size</span><span>() </span><span style=color:#3e999f>== </span><span style=color:#f07219>3</span><span>) {
+</span><span>        </span><span style=color:#8959a8>return</span><span> word[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>== </span><span style=color:#839c00>'c' </span><span style=color:#3e999f>and
+</span><span>               word[</span><span style=color:#f07219>1</span><span>] </span><span style=color:#3e999f>== </span><span style=color:#839c00>'a' </span><span style=color:#3e999f>and
+</span><span>               word[</span><span style=color:#f07219>2</span><span>] </span><span style=color:#3e999f>== </span><span style=color:#839c00>'t'</span><span>;
+</span><span>    }
+</span><span>    </span><span style=color:#8959a8>return </span><span style=color:#f07219>false</span><span>;
+</span><span>}
+</span><span>
+</span><span style=color:#8959a8>int </span><span style=color:#4271ae>main</span><span>() {
+</span><span>    std::string word </span><span style=color:#3e999f>= </span><span style=color:#839c00>""</span><span>;
+</span><span>    </span><span style=color:#c99e00>uint32_t</span><span> seed </span><span style=color:#3e999f>= </span><span style=color:#f07219>42</span><span>;
+</span><span>    </span><span style=color:#c99e00>uint32_t</span><span> last_seed </span><span style=color:#3e999f>=</span><span> seed;
+</span><span>    </span><span style=color:#c99e00>uint64_t</span><span> steps </span><span style=color:#3e999f>= </span><span style=color:#f07219>0</span><span>;
+</span><span>
+</span><span>    </span><span style=color:#8959a8>while </span><span>(</span><span style=color:#f07219>true</span><span>) {
+</span><span>        seed </span><span style=color:#3e999f>= </span><span style=color:#c82728>xorshift</span><span style=color:#4271ae>(seed)</span><span>;
+</span><span>        steps </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>        </span><span style=color:#c99e00>uint8_t</span><span> v </span><span style=color:#3e999f>=</span><span> seed </span><span style=color:#3e999f>% </span><span style=color:#f07219>255</span><span>;
+</span><span>        </span><span style=color:#8959a8>if </span><span>(</span><span style=color:#4271ae>isalpha(v)</span><span>) {
+</span><span>            </span><span style=color:#8e908c>// если это буква алфавита то добавляем в слово
+</span><span>            word.</span><span style=color:#c82728>push_back</span><span>(</span><span style=color:#8959a8>char</span><span>(v));
+</span><span>        } </span><span style=color:#8959a8>else </span><span>{
+</span><span>            </span><span style=color:#8e908c>// нашли кота?
+</span><span>            </span><span style=color:#8959a8>if </span><span>(</span><span style=color:#c82728>is_cat</span><span style=color:#4271ae>(word)</span><span>) {
+</span><span>                std::cout </span><span style=color:#3e999f><< </span><span style=color:#839c00>"found [" </span><span style=color:#3e999f><<</span><span> last_seed </span><span style=color:#3e999f><< </span><span style=color:#839c00>"] with " </span><span style=color:#3e999f><<</span><span> steps </span><span style=color:#3e999f><< </span><span style=color:#839c00>" steps: " </span><span style=color:#3e999f><<</span><span> word </span><span style=color:#3e999f><<</span><span> std::endl;
+</span><span>                </span><span style=color:#8959a8>return </span><span style=color:#f07219>0</span><span>;
+</span><span>            }
+</span><span>            last_seed </span><span style=color:#3e999f>=</span><span> seed;
+</span><span>            word </span><span style=color:#3e999f>= </span><span style=color:#839c00>""</span><span>;
+</span><span>        }
+</span><span>    }
+</span><span>}
+</span></code></pre><p>Код написан не идеально, но в данном случае этого достаточно чтобы довольно быстро найти значение <code>357063244</code> пройдя <code>69_990_600</code> итераций, что довольно неплохо!<p>С помощью ранее представленной программы можем проверить его:<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> ./prove_xorshift 357063244 3
+</span><span style=color:#c82728>result:</span><span style=color:#4271ae> cat
+</span></code></pre><p>Но будет не интересно останавливаться на таком простом переборе и поэтому давайте улучшим наш алгоритм!<h2 id=uluchshennyi-algoritm>Улучшенный алгоритм</h2><p>Суть в том чтобы вместо обычного перебора брать и находить такие числа <code>N</code> удовлетворяющие условию <code>N % 255 = K</code>, где <code>K</code> — первая буква слова 'cat'.<p>То есть нам нужно найти <code>seed</code>, <code>N1</code>, <code>N2</code> и <code>N3</code> по ранее поставленным условиям:<pre style=color:#111;background-color:#f9f9f9><code><span>N1 = xorshift(seed)
+</span><span>N2 = xorshift(N1)
+</span><span>N3 = xorshift(N2)
+</span><span>N1 % 255 = 'c'
+</span><span>N2 % 255 = 'a'
+</span><span>N3 % 255 = 't'
+</span></code></pre><p>Для нахождения <code>N1</code> мы можем воспользоваться формулой из статьи на <a href=https://ru.wikipedia.org/wiki/%D0%94%D0%B5%D0%BB%D0%B5%D0%BD%D0%B8%D0%B5_%D1%81_%D0%BE%D1%81%D1%82%D0%B0%D1%82%D0%BA%D0%BE%D0%BC>вики</a>.<p>Подставляя все значения в формулу и заменяя <code>a</code> на <code>N1</code> и <code>q</code> на <code>i</code> получим:<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span>N1 </span><span style=color:#3e999f>= </span><span style=color:#f07219>255 </span><span style=color:#3e999f>* </span><span>i </span><span style=color:#3e999f>+ </span><span style=color:#c99e00>int</span><span style=color:#4271ae>(</span><span style=color:#839c00>'c'</span><span style=color:#4271ae>)
+</span></code></pre><p>На данном этапе мы может определить <code>N1</code>, <code>N2</code> и <code>N3</code> просто перебирая все возможные <code>N1</code> и проверяя на наше условие, но остаётся ещё число <code>seed</code>.<p>Пришлось покапаться в интернете для поиска того, что может помощь найти значение <code>seed</code> из <code>N1</code>. Я наткнулся на <a href=https://blog.securityevaluators.com/xorshift128-backward-ff3365dc0c17>интересную статью</a> в которой хоть и описывается обращение алгоритма XorShift128+, но самой идеи будет достаточно чтобы реализовать аналогичное решения для нашего 32-битного варианта.<p>Всё что нужно нам сделать — обратить все операции алгоритма и для этого разобьём задачу на три маленьких подзадачи, где мы будем обращать одну операцию за раз, а потом объединим результаты каждого из шагов, но только в обратном порядке.<p>Для обращения <code>seed ^= seed << 13</code> можно сразу восстановить большую часть изначального значения, а затем сделать сдвиг и восстановить всё значение<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span>tmp </span><span style=color:#3e999f>= </span><span>(seed </span><span style=color:#3e999f>^ </span><span>(seed </span><span style=color:#3e999f><< </span><span style=color:#f07219>13</span><span>)) </span><span style=color:#3e999f>& </span><span style=color:#f07219>0x00FFFFFF
+</span><span>result </span><span style=color:#3e999f>= </span><span>seed </span><span style=color:#3e999f>^ </span><span>((tmp </span><span style=color:#3e999f><< </span><span style=color:#f07219>13</span><span>) </span><span style=color:#3e999f>& </span><span style=color:#f07219>0xFFFFFFFF</span><span>)
+</span></code></pre><p>Для <code>seed ^= seed >> 17</code> решение вообще элементарное<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span>result </span><span style=color:#3e999f>= </span><span>(seed </span><span style=color:#3e999f>^ </span><span>(seed </span><span style=color:#3e999f>>> </span><span style=color:#f07219>17</span><span>)) </span><span style=color:#3e999f>& </span><span style=color:#f07219>0xFFFFFFFF
+</span></code></pre><p>А вот для <code>seed ^= seed << 5</code> нужно немного потрудиться, т.к. от оригинального значения осталось совсем мало<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8e908c># получаем два изначальных байта
+</span><span>f1 </span><span style=color:#3e999f>= </span><span>(seed </span><span style=color:#3e999f>^ </span><span>(seed </span><span style=color:#3e999f><< </span><span style=color:#f07219>5</span><span>)) </span><span style=color:#3e999f>& </span><span style=color:#f07219>0xFF
+</span><span style=color:#8e908c># а теперь у нас их три
+</span><span>f2 </span><span style=color:#3e999f>= </span><span>(seed </span><span style=color:#3e999f>^ </span><span>(  f1 </span><span style=color:#3e999f><< </span><span style=color:#f07219>5</span><span>)) </span><span style=color:#3e999f>& </span><span style=color:#f07219>0xFFF
+</span><span>f3 </span><span style=color:#3e999f>= </span><span>(seed </span><span style=color:#3e999f>^ </span><span>(  f2 </span><span style=color:#3e999f><< </span><span style=color:#f07219>5</span><span>)) </span><span style=color:#3e999f>& </span><span style=color:#f07219>0xFFFF
+</span><span>f4 </span><span style=color:#3e999f>= </span><span>(seed </span><span style=color:#3e999f>^ </span><span>(  f3 </span><span style=color:#3e999f><< </span><span style=color:#f07219>5</span><span>)) </span><span style=color:#3e999f>& </span><span style=color:#f07219>0xFFFFF
+</span><span>f5 </span><span style=color:#3e999f>= </span><span>(seed </span><span style=color:#3e999f>^ </span><span>(  f4 </span><span style=color:#3e999f><< </span><span style=color:#f07219>5</span><span>)) </span><span style=color:#3e999f>& </span><span style=color:#f07219>0xFFFFFF
+</span><span>f6 </span><span style=color:#3e999f>= </span><span>(seed </span><span style=color:#3e999f>^ </span><span>(  f5 </span><span style=color:#3e999f><< </span><span style=color:#f07219>5</span><span>)) </span><span style=color:#3e999f>& </span><span style=color:#f07219>0xFFFFFFF
+</span><span style=color:#8e908c># и постепенно приходим к результату
+</span><span>result </span><span style=color:#3e999f>= </span><span>(seed </span><span style=color:#3e999f>^ </span><span>(  f6 </span><span style=color:#3e999f><< </span><span style=color:#f07219>5</span><span>)) </span><span style=color:#3e999f>& </span><span style=color:#f07219>0xFFFFFFFF
+</span></code></pre><p>Если не понятно как это всё работает, то стоит почитать про операции <a href=https://ru.wikipedia.org/wiki/%D0%98%D1%81%D0%BA%D0%BB%D1%8E%D1%87%D0%B0%D1%8E%D1%89%D0%B5%D0%B5_%C2%AB%D0%B8%D0%BB%D0%B8%C2%BB>исключающее или</a> и <a href=https://ru.wikipedia.org/wiki/%D0%91%D0%B8%D1%82%D0%BE%D0%B2%D1%8B%D0%B9_%D1%81%D0%B4%D0%B2%D0%B8%D0%B3>логический сдвиг</a>.<p>Ну, а теперь остаётся только всё это закодить<pre class=language-c++ data-lang=c++ style=color:#111;background-color:#f9f9f9><code class=language-c++ data-lang=c++><span style=color:#8959a8>#include </span><span style=color:#839c00>&LTiostream>
+</span><span style=color:#8959a8>#include </span><span style=color:#839c00>&LTlimits>
+</span><span style=color:#8959a8>#include </span><span style=color:#839c00>&LTstring>
+</span><span>
+</span><span style=color:#8959a8>#include </span><span style=color:#839c00>"xorshift.hpp"
+</span><span>
+</span><span style=color:#8959a8>const </span><span style=color:#c99e00>uint32_t</span><span> ascii_max </span><span style=color:#3e999f>= </span><span style=color:#f07219>255</span><span>;
+</span><span style=color:#8959a8>const char</span><span> c_symb </span><span style=color:#3e999f>= </span><span style=color:#839c00>'c'</span><span>;
+</span><span>
+</span><span style=color:#8959a8>bool </span><span style=color:#4271ae>is_cat</span><span>(</span><span style=color:#c99e00>uint32_t </span><span style=color:#f07219>c</span><span>, </span><span style=color:#c99e00>uint32_t </span><span style=color:#f07219>a</span><span>, </span><span style=color:#c99e00>uint32_t </span><span style=color:#f07219>t</span><span>) {
+</span><span>    </span><span style=color:#8959a8>return char</span><span>(c </span><span style=color:#3e999f>%</span><span> ascii_max) </span><span style=color:#3e999f>==</span><span> c_symb </span><span style=color:#3e999f>and
+</span><span>           </span><span style=color:#8959a8>char</span><span>(a </span><span style=color:#3e999f>%</span><span> ascii_max) </span><span style=color:#3e999f>== </span><span style=color:#839c00>'a' </span><span style=color:#3e999f>and
+</span><span>           </span><span style=color:#8959a8>char</span><span>(t </span><span style=color:#3e999f>%</span><span> ascii_max) </span><span style=color:#3e999f>== </span><span style=color:#839c00>'t'</span><span>;
+</span><span>}
+</span><span>
+</span><span style=color:#c99e00>uint32_t </span><span style=color:#4271ae>n_vals</span><span>(</span><span style=color:#c99e00>uint32_t </span><span style=color:#f07219>i</span><span>) {
+</span><span>    </span><span style=color:#8959a8>return</span><span> ascii_max </span><span style=color:#3e999f>*</span><span> i </span><span style=color:#3e999f>+ </span><span style=color:#c99e00>uint8_t</span><span>(c_symb);
+</span><span>}
+</span><span>
+</span><span style=color:#c99e00>uint32_t </span><span style=color:#4271ae>xorshift_backward</span><span>(</span><span style=color:#c99e00>uint32_t </span><span style=color:#f07219>seed</span><span>) {
+</span><span>    </span><span style=color:#c99e00>uint32_t</span><span> f0 </span><span style=color:#3e999f>= </span><span>(seed </span><span style=color:#3e999f>^ </span><span>(seed </span><span style=color:#3e999f><< </span><span style=color:#f07219>5</span><span>)) </span><span style=color:#3e999f>& </span><span style=color:#f07219>0xFF</span><span>;
+</span><span>    </span><span style=color:#c99e00>uint32_t</span><span> f1 </span><span style=color:#3e999f>= </span><span>(seed </span><span style=color:#3e999f>^ </span><span>(f0 </span><span style=color:#3e999f><< </span><span style=color:#f07219>5</span><span>)) </span><span style=color:#3e999f>& </span><span style=color:#f07219>0xFFF</span><span>;
+</span><span>    f0 </span><span style=color:#3e999f>= </span><span>(seed </span><span style=color:#3e999f>^ </span><span>(f1 </span><span style=color:#3e999f><< </span><span style=color:#f07219>5</span><span>)) </span><span style=color:#3e999f>& </span><span style=color:#f07219>0xFFFF</span><span>;
+</span><span>    f1 </span><span style=color:#3e999f>= </span><span>(seed </span><span style=color:#3e999f>^ </span><span>(f0 </span><span style=color:#3e999f><< </span><span style=color:#f07219>5</span><span>)) </span><span style=color:#3e999f>& </span><span style=color:#f07219>0xFFFFF</span><span>;
+</span><span>    f0 </span><span style=color:#3e999f>= </span><span>(seed </span><span style=color:#3e999f>^ </span><span>(f1 </span><span style=color:#3e999f><< </span><span style=color:#f07219>5</span><span>)) </span><span style=color:#3e999f>& </span><span style=color:#f07219>0xFFFFFF</span><span>;
+</span><span>    f1 </span><span style=color:#3e999f>= </span><span>(seed </span><span style=color:#3e999f>^ </span><span>(f0 </span><span style=color:#3e999f><< </span><span style=color:#f07219>5</span><span>)) </span><span style=color:#3e999f>& </span><span style=color:#f07219>0xFFFFFFF</span><span>;
+</span><span>    seed </span><span style=color:#3e999f>^=</span><span> f1 </span><span style=color:#3e999f><< </span><span style=color:#f07219>5</span><span>;
+</span><span>    seed </span><span style=color:#3e999f>^=</span><span> seed </span><span style=color:#3e999f>>> </span><span style=color:#f07219>17</span><span>;
+</span><span>    </span><span style=color:#8959a8>return</span><span> seed </span><span style=color:#3e999f>^ </span><span>(((seed </span><span style=color:#3e999f>^ </span><span>(seed </span><span style=color:#3e999f><< </span><span style=color:#f07219>13</span><span>)) </span><span style=color:#3e999f>& </span><span style=color:#f07219>0x00FFFFFF</span><span>) </span><span style=color:#3e999f><< </span><span style=color:#f07219>13</span><span>);
+</span><span>}
+</span><span>
+</span><span style=color:#8959a8>int </span><span style=color:#4271ae>main</span><span>() {
+</span><span>    </span><span style=color:#8959a8>for </span><span>(</span><span style=color:#c99e00>uint32_t</span><span> i </span><span style=color:#3e999f>= </span><span style=color:#f07219>0</span><span>; i </span><span style=color:#3e999f><</span><span> std::numeric_limits<</span><span style=color:#c99e00>uint32_t</span><span>></span><span style=color:#4271ae>::</span><span style=color:#c82728>max</span><span style=color:#4271ae>()</span><span>; i</span><span style=color:#3e999f>++</span><span>) {
+</span><span>        </span><span style=color:#c99e00>uint32_t</span><span> c </span><span style=color:#3e999f>= </span><span style=color:#c82728>n_vals</span><span style=color:#4271ae>(i)</span><span>;
+</span><span>        </span><span style=color:#c99e00>uint32_t</span><span> a </span><span style=color:#3e999f>= </span><span style=color:#c82728>xorshift</span><span style=color:#4271ae>(c)</span><span>;
+</span><span>        </span><span style=color:#c99e00>uint32_t</span><span> t </span><span style=color:#3e999f>= </span><span style=color:#c82728>xorshift</span><span style=color:#4271ae>(a)</span><span>;
+</span><span>        </span><span style=color:#8959a8>if </span><span>(</span><span style=color:#c82728>is_cat</span><span style=color:#4271ae>(c, a, t)</span><span>) {
+</span><span>            </span><span style=color:#c99e00>uint32_t</span><span> seed </span><span style=color:#3e999f>= </span><span style=color:#c82728>xorshift_backward</span><span style=color:#4271ae>(c)</span><span>;
+</span><span>            std::cout </span><span style=color:#3e999f><< </span><span style=color:#839c00>"found " </span><span style=color:#3e999f><<</span><span> seed </span><span style=color:#3e999f><< </span><span style=color:#839c00>" at step " </span><span style=color:#3e999f><<</span><span> i </span><span style=color:#3e999f><<</span><span> std::endl;
+</span><span>            </span><span style=color:#8959a8>return </span><span style=color:#f07219>0</span><span>;
+</span><span>        }
+</span><span>    }
+</span><span>}
+</span></code></pre><p>В результате программа быстро (за <code>1315</code> шагов) находит первый <code>seed</code>, который ведёт к 'cat': <code>4140321215</code>.<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> ./prove_xorshift 4140321215 3
+</span><span style=color:#c82728>result:</span><span style=color:#4271ae> cat
+</span></code></pre><h1 id=kot-v-kheshakh>Кот в хешах</h1><p>С xor shift закончим. Теперь перейдём на поиск кота в хеше.<p>Сразу встаёт вопрос: как будем представлять значение хеша в виде текста?<p>Мне сразу напросилось простое решение:<ul><li>интерпретируем каждые 2 символа как шестнадцатеричное значение<li>будем выводить только символы из диапазона [a-zA-Z], а остальные заменять на '-'</ul><p>То есть хеш<pre style=color:#111;background-color:#f9f9f9><code><span>2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824
+</span></code></pre><p>преобразуется в<pre style=color:#111;background-color:#f9f9f9><code><span>--M-------------------B-s--b----
+</span></code></pre><p>где '-' — символы вне диапазона.<h2 id=naivnyi-algoritm-1>Наивный алгоритм</h2><p>В качестве наивного алгоритма сделаем следующее: сгенерируем некоторые случайное число с помощью <code>random</code>, потом преобразуем его в строку и посчитаем хеш.<p>Остаётся только преобразовать полученный хеш в читаемую строку и проверить если ли подстрока 'cat' в данной строке.<p>Замечу два момента:<ul><li>в качестве входной строки для хеш алгоритма был взят первый придуманный мной вариант, но вы можете взять что вашей душе угодно<li>в данной реализации не будем считать количество проделанных итераций, т.к. мы используем функцию <code>random</code></ul><p>К коллайдеру! То есть к коду!<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8e908c># можно заменить на любую другую хеш функцию
+</span><span style=color:#8959a8>from </span><span>hashlib </span><span style=color:#8959a8>import </span><span>sha256 </span><span style=color:#8959a8>as </span><span>hasher
+</span><span style=color:#8959a8>from </span><span>random </span><span style=color:#8959a8>import </span><span>random
+</span><span>
+</span><span>
+</span><span style=color:#8e908c># наш алфавит
+</span><span>alphabet </span><span style=color:#3e999f>= </span><span style=color:#839c00>'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+</span><span>
+</span><span>
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>as_text</span><span>(</span><span style=color:#f07219>value</span><span>):
+</span><span>    result </span><span style=color:#3e999f>= </span><span style=color:#839c00>''
+</span><span>    </span><span style=color:#8e908c># будем идти по два символа
+</span><span>    </span><span style=color:#8959a8>for </span><span>index </span><span style=color:#8959a8>in </span><span style=color:#4271ae>range(</span><span style=color:#f07219>0</span><span style=color:#4271ae>, len(value), </span><span style=color:#f07219>2</span><span style=color:#4271ae>)</span><span>:
+</span><span>        </span><span style=color:#8e908c># преобразуем в число
+</span><span>        block </span><span style=color:#3e999f>= </span><span style=color:#c99e00>int</span><span style=color:#4271ae>(value[index:index </span><span style=color:#3e999f>+ </span><span style=color:#f07219>2</span><span style=color:#4271ae>], </span><span style=color:#f07219>16</span><span style=color:#4271ae>)
+</span><span>        </span><span style=color:#8e908c># а потом в символ
+</span><span>        symbol </span><span style=color:#3e999f>= </span><span style=color:#4271ae>chr(block)
+</span><span>        </span><span style=color:#8e908c># и если он есть в алфавите, то добавляем в результирующую строку
+</span><span>        result </span><span style=color:#3e999f>+= </span><span>symbol </span><span style=color:#8959a8>if </span><span>symbol </span><span style=color:#3e999f>in </span><span>alphabet </span><span style=color:#8959a8>else </span><span style=color:#839c00>'-'
+</span><span>    </span><span style=color:#8959a8>return </span><span>result
+</span><span>
+</span><span>
+</span><span style=color:#8959a8>if </span><span>__name__ </span><span style=color:#3e999f>== </span><span style=color:#839c00>'__main__'</span><span>:
+</span><span>    result </span><span style=color:#3e999f>= </span><span style=color:#839c00>''
+</span><span>    </span><span style=color:#8e908c># перебираем пока не найдём кота
+</span><span>    </span><span style=color:#8959a8>while </span><span style=color:#839c00>'cat' </span><span style=color:#3e999f>not in </span><span>result:
+</span><span>        </span><span style=color:#8e908c># генерируем
+</span><span>        text </span><span style=color:#3e999f>= </span><span style=color:#c99e00>str</span><span style=color:#4271ae>(</span><span style=color:#c82728>random</span><span style=color:#4271ae>())
+</span><span>        </span><span style=color:#8e908c># хешируем
+</span><span>        hashv </span><span style=color:#3e999f>= </span><span style=color:#c82728>hasher</span><span style=color:#4271ae>(text.</span><span style=color:#c82728>encode</span><span style=color:#4271ae>()).</span><span style=color:#c82728>hexdigest</span><span style=color:#4271ae>()
+</span><span>        </span><span style=color:#8e908c># и в строку
+</span><span>        result </span><span style=color:#3e999f>= </span><span style=color:#c82728>as_text</span><span style=color:#4271ae>(hashv)
+</span><span>    </span><span style=color:#4271ae>print(</span><span style=color:#8959a8>f</span><span style=color:#839c00>"'</span><span style=color:#4271ae>{text}</span><span style=color:#839c00>' -> </span><span style=color:#4271ae>{hashv}</span><span style=color:#839c00> -> </span><span style=color:#4271ae>{result}</span><span style=color:#839c00>"</span><span style=color:#4271ae>)
+</span></code></pre><p>Не забываем про утилиту для проверки хешей в ручном режиме:<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span>alphabet </span><span style=color:#3e999f>= </span><span style=color:#839c00>'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+</span><span>
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>as_text</span><span>(</span><span style=color:#f07219>value</span><span>):
+</span><span>    result </span><span style=color:#3e999f>= </span><span style=color:#839c00>''
+</span><span>    </span><span style=color:#8959a8>for </span><span>index </span><span style=color:#8959a8>in </span><span style=color:#4271ae>range(</span><span style=color:#f07219>0</span><span style=color:#4271ae>, len(value), </span><span style=color:#f07219>2</span><span style=color:#4271ae>)</span><span>:
+</span><span>        block </span><span style=color:#3e999f>= </span><span style=color:#c99e00>int</span><span style=color:#4271ae>(value[index:index </span><span style=color:#3e999f>+ </span><span style=color:#f07219>2</span><span style=color:#4271ae>], </span><span style=color:#f07219>16</span><span style=color:#4271ae>)
+</span><span>        symbol </span><span style=color:#3e999f>= </span><span style=color:#4271ae>chr(block)
+</span><span>        result </span><span style=color:#3e999f>+= </span><span>symbol </span><span style=color:#8959a8>if </span><span>symbol </span><span style=color:#3e999f>in </span><span>alphabet </span><span style=color:#8959a8>else </span><span style=color:#839c00>'-'
+</span><span>    </span><span style=color:#8959a8>return </span><span>result
+</span><span>
+</span><span style=color:#4271ae>print(</span><span style=color:#c82728>as_text</span><span style=color:#4271ae>(input(</span><span style=color:#839c00>'Input hash: '</span><span style=color:#4271ae>)))
+</span></code></pre><p>С помощью данного наивного подхода был найден вот такой вариант<pre style=color:#111;background-color:#f9f9f9><code><span>c3377fd3636174cd06a81f38550d7057e2c676a7d20dbc38f8dfb957e25574c0
+</span></code></pre><p>на основе вот этой строки<pre style=color:#111;background-color:#f9f9f9><code><span>'0.44509213875838727'
+</span></code></pre><p>сами можете убедиться с помощью <code>sha256sum</code><pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> echo</span><span style=color:#f07219> -en </span><span style=color:#839c00>"0.44509213875838727" </span><span style=color:#3e999f>| </span><span style=color:#c82728>sha256sum</span><span style=color:#f07219> -t
+</span><span style=color:#c82728>c3377fd3636174cd06a81f38550d7057e2c676a7d20dbc38f8dfb957e25574c0</span><span style=color:#4271ae>  -
+</span></code></pre><p>а вот так выглядит преобразованный хеш в виде строки<pre style=color:#111;background-color:#f9f9f9><code><span>----cat-----U-pW--v--------W-Ut-
+</span></code></pre><h1 id=zakliuchenie>Заключение</h1><p>Я бы сказал "Не будем останавливаться на достигнутом — реализуем более быстрый алгоритм", но у меня пока нет идей для него! Как только я его придумаю, то напишу отдельный пост.<p>Весь написанный мной код можно взять <a href=https://gist.github.com/FreeCX/8edf5765359fed634fe8738264f06c9b>по ссылке</a>.<p>Всем пока!<h1 id=chto-pochitat>Что почитать</h1><ol><li><a href=https://en.wikipedia.org/wiki/SHA-2>SHA-2</a><li><a href=https://en.wikipedia.org/wiki/Xorshift>Xorshift</a><li><a href=https://www.jstatsoft.org/article/view/v008i14>Xorshift RNGs</a><li><a href=https://ru.wikipedia.org/wiki/%D0%94%D0%B5%D0%BB%D0%B5%D0%BD%D0%B8%D0%B5_%D1%81_%D0%BE%D1%81%D1%82%D0%B0%D1%82%D0%BA%D0%BE%D0%BC>Деление с остатком</a><li><a href=https://blog.securityevaluators.com/xorshift128-backward-ff3365dc0c17>XorShift128+ Backward</a><li><a href=https://ru.wikipedia.org/wiki/%D0%98%D1%81%D0%BA%D0%BB%D1%8E%D1%87%D0%B0%D1%8E%D1%89%D0%B5%D0%B5_%C2%AB%D0%B8%D0%BB%D0%B8%C2%BB>Исключающее «или»</a><li><a href=https://ru.wikipedia.org/wiki/%D0%91%D0%B8%D1%82%D0%BE%D0%B2%D1%8B%D0%B9_%D1%81%D0%B4%D0%B2%D0%B8%D0%B3>Логический сдвиг</a></ol></article><div class=back><a href=https://freecx.github.io/>Назад</a></div><div class=footer><span>Также читайте <a title="ты сам сломал ссылку, так что ничего личного" href=https://antoniii.github.io/> <s>antoniii</s> </a> <a href=https://citrux.github.io/>citrux</a> <a href=https://sputnikas.github.io/>sputnikas</a> </span></div><script>let msg=` А спонсор статей в моём блоге -- моя лень -- спонсор статей.`;[`=`.repeat(msg.length+ 1),msg,`=`.repeat(msg.length+ 1)].forEach(a=>console.warn(a))</script>

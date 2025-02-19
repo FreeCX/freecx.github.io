@@ -1,0 +1,692 @@
+<!doctype html><html lang=ru><head><meta charset=utf-8><meta content="IE=edge" http-equiv=X-UA-Compatible><meta content="width=device-width,initial-scale=1" name=viewport><title>А не написать ли мне сервер?</title><meta content="Кодерный понедельник" name=description><meta content=https://freecx.github.io/touch-icon.png property=og:image><link href=https://code.cdn.mozilla.net/fonts/fira.css rel=stylesheet><link href=https://freecx.github.io/favicon.png rel=icon><link href=https://freecx.github.io/touch-icon.png rel=apple-touch-icon><link href=https://freecx.github.io/main.css rel=stylesheet><link href=https://freecx.github.io/syntax.css rel=stylesheet><body><aside class=logo><a href=https://github.com/FreeCX> <img class=gravatar src=https://freecx.github.io/avatar.png> </a><span class=logo-prompt>Я на github</span></aside><article><div class=center><h1>А не написать ли мне сервер?</h1><time>2 December 2023</time></div><div class=divider></div><p>Всем привет.<p>“Недавно” мне пришла в голову довольная странная идея о реализации небольшого http сервера. Не знаю конечно зачем мне это было нужно, но разбираться в технологии, которые мы используем каждый день довольно интересно и познавательно.<p>Если вам это не очень интересно, то всегда можете сразу перейти <a href=https://github.com/FreeCX/micro-http>к коду</a>.<p>Вообще эта статья должна была выйти давным-давно, но мне было лень её дописывать.<h1 id=vvedenie>Введение</h1><p>Я бы предложил для начала посмотреть статью <a href=https://medium.com/from-the-scratch/http-server-what-do-you-need-to-know-to-build-a-simple-http-server-from-scratch-d1ef8945e4fa>HTTP Server: Everything you need to know to Build a simple HTTP server from scratch</a>, где неплохо описывается реализация с сервера нуля.<p>Но вообще, если хотите разобраться в тонкостях работы, то стоит обратиться к вот этому списку RFC, которые описывают реализацию <strong>HTTP/1.1</strong>:<ul><li><a href=https://www.rfc-editor.org/info/rfc7230>RFC 7230</a><li><a href=https://www.rfc-editor.org/info/rfc7231>RFC 7231</a><li><a href=https://www.rfc-editor.org/info/rfc7232>RFC 7232</a><li><a href=https://www.rfc-editor.org/info/rfc7233>RFC 7233</a><li><a href=https://www.rfc-editor.org/info/rfc7234>RFC 7234</a><li><a href=https://www.rfc-editor.org/info/rfc7235>RFC 7235</a></ul><p>Вообще я не ставил себе цель в полной поддержке RFC, да и вообще пошёл ленивым путём — реализовал только то, что было нужно для работы демо сайта.<p>Ладно, давайте уже закончим на этом введении и перейдём к написанию кода.<h1 id=hello-world>Hello world</h1><p>Для самой минимальной рабочей программы нужно несколько вещей:<ul><li>открыть порт и слушать его<li>обработать входящий коннект<li>сформировать ответ</ul><p>Набросаем базовую часть кода<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>use </span><span>std::net::{TcpListener, TcpStream};
+</span><span>
+</span><span style=color:#8959a8>fn </span><span style=color:#4271ae>handle_connection</span><span>(</span><span style=color:#f07219>stream</span><span>: TcpStream) {
+</span><span>    todo!()
+</span><span>}
+</span><span>
+</span><span style=color:#8959a8>fn </span><span style=color:#4271ae>main</span><span>() {
+</span><span>    </span><span style=color:#8e908c>// забьём на обработку ошибок
+</span><span>    </span><span style=color:#8959a8>let</span><span> listener </span><span style=color:#3e999f>= </span><span>TcpListener::bind((</span><span style=color:#839c00>"127.0.0.1"</span><span>, </span><span style=color:#f07219>8000</span><span>)).</span><span style=color:#4271ae>unwrap</span><span>();
+</span><span>    </span><span style=color:#8e908c>// про flatten мне clippy подсказал
+</span><span>    </span><span style=color:#8959a8>for</span><span> stream </span><span style=color:#3e999f>in</span><span> listener.</span><span style=color:#4271ae>incoming</span><span>().</span><span style=color:#4271ae>flatten</span><span>() {
+</span><span>        </span><span style=color:#4271ae>handle_connection</span><span>(stream);
+</span><span>    }
+</span><span>}
+</span></code></pre><p>Базовый код накидали и теперь нужно написать обработчик <strong>handle_connection</strong> и наш <em>Hello world</em> готов!<p>Для его реализации нам необходимо произвести несколько действий:<ol><li>считать заголовочную часть запроса<li>распарсить её<li>дочитать контент<li>и ответить по форме</ol><p>Первую часть для удобства вынесем в отдельную функцию.<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>use </span><span>std::io::Read;
+</span><span>
+</span><span style=color:#8e908c>// https://ru.wikipedia.org/wiki/Перевод_строки
+</span><span style=color:#8e908c>// cr - возврат каретки (carriage return)
+</span><span style=color:#8e908c>// lf - перевод строки (line feed)
+</span><span style=color:#8959a8>fn </span><span style=color:#4271ae>read_until_crlf</span><span>&LTR: Read>(</span><span style=color:#f07219>r</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut</span><span> R) -> </span><span style=color:#c99e00>Option</span><span><</span><span style=color:#c99e00>String</span><span>> {
+</span><span>    </span><span style=color:#8959a8>let mut</span><span> buf </span><span style=color:#3e999f>= </span><span style=color:#c99e00>Vec</span><span>::new();
+</span><span>
+</span><span>    </span><span style=color:#8e908c>// будем читать входной поток по одному байту
+</span><span>    </span><span style=color:#8e908c>// это не эффективно, но без заморочек
+</span><span>    </span><span style=color:#8959a8>for</span><span> b </span><span style=color:#3e999f>in</span><span> r.</span><span style=color:#4271ae>bytes</span><span>() {
+</span><span>        buf.</span><span style=color:#4271ae>push</span><span>(b.</span><span style=color:#4271ae>ok</span><span>()</span><span style=color:#3e999f>?</span><span>);
+</span><span>        </span><span style=color:#8e908c>// и прервём чтение на двойном crlf
+</span><span>        </span><span style=color:#8959a8>if</span><span> buf.</span><span style=color:#4271ae>ends_with</span><span>(</span><span style=color:#8959a8>b</span><span style=color:#839c00>"</span><span style=color:#f07219>\r\n\r\n</span><span style=color:#839c00>"</span><span>) {
+</span><span>            </span><span style=color:#8959a8>break</span><span>;
+</span><span>        }
+</span><span>    }
+</span><span>
+</span><span>    </span><span style=color:#8e908c>// естественно нам нужна строка для последующего парсинга
+</span><span>    </span><span style=color:#c99e00>String</span><span>::from_utf8(buf).</span><span style=color:#4271ae>ok</span><span>()
+</span><span>}
+</span></code></pre><p>И теперь осталось только реализовать <strong>handle_connection</strong><pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>use </span><span>std::collections::HashMap;
+</span><span style=color:#8959a8>use </span><span>std::io::{Write};
+</span><span>
+</span><span style=color:#8959a8>fn </span><span style=color:#4271ae>handle_connection</span><span>(</span><span style=color:#f07219>stream</span><span>: TcpStream) {
+</span><span>    </span><span style=color:#8e908c>// читаем заголовок запроса
+</span><span>    </span><span style=color:#8959a8>let</span><span> buffer </span><span style=color:#3e999f>= </span><span style=color:#4271ae>read_until_crlf</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut</span><span> stream).</span><span style=color:#4271ae>unwrap</span><span>();
+</span><span>
+</span><span>    </span><span style=color:#8959a8>let mut</span><span> headers </span><span style=color:#3e999f>= </span><span>HashMap::new();
+</span><span>    </span><span style=color:#8e908c>// парсим заголовок
+</span><span>    </span><span style=color:#8e908c>// первую строку просто пропускаем
+</span><span>    </span><span style=color:#8959a8>for</span><span> line </span><span style=color:#3e999f>in</span><span> buffer.</span><span style=color:#4271ae>split</span><span>(</span><span style=color:#839c00>"</span><span style=color:#f07219>\r\n</span><span style=color:#839c00>"</span><span>).</span><span style=color:#4271ae>skip</span><span>(</span><span style=color:#f07219>1</span><span>) {
+</span><span>        </span><span style=color:#8e908c>// игнорируем пустые строки
+</span><span>        </span><span style=color:#8959a8>if</span><span> line.</span><span style=color:#4271ae>trim</span><span>().</span><span style=color:#4271ae>is_empty</span><span>() {
+</span><span>            </span><span style=color:#8959a8>continue</span><span>;
+</span><span>        }
+</span><span>        </span><span style=color:#8e908c>// а остальные разделяем по шаблону
+</span><span>        </span><span style=color:#8959a8>let </span><span>(key, value) </span><span style=color:#3e999f>=</span><span> line.</span><span style=color:#4271ae>split_once</span><span>(</span><span style=color:#839c00>':'</span><span>).</span><span style=color:#4271ae>unwrap</span><span>();
+</span><span>        </span><span style=color:#8e908c>// будем складывать ключи в нижнем регистре - чисто для удобства
+</span><span>        headers.</span><span style=color:#4271ae>insert</span><span>(key.</span><span style=color:#4271ae>trim</span><span>().</span><span style=color:#4271ae>to_lowercase</span><span>(), value[</span><span style=color:#f07219>1</span><span style=color:#3e999f>..</span><span>].</span><span style=color:#4271ae>trim</span><span>());
+</span><span>    }
+</span><span>
+</span><span>    </span><span style=color:#8e908c>// дочитываем контент (если он есть)
+</span><span>    </span><span style=color:#8959a8>if</span><span> headers.</span><span style=color:#4271ae>contains_key</span><span>(</span><span style=color:#839c00>"content-length"</span><span>) {
+</span><span>        </span><span style=color:#8e908c>// узнаём размер контента
+</span><span>        </span><span style=color:#8959a8>let</span><span> size: </span><span style=color:#8959a8>u64 </span><span style=color:#3e999f>=</span><span> headers.</span><span style=color:#4271ae>get</span><span>(</span><span style=color:#839c00>"content-length"</span><span>).</span><span style=color:#4271ae>unwrap</span><span>().</span><span style=color:#4271ae>parse</span><span>().</span><span style=color:#4271ae>unwrap</span><span>();
+</span><span>        </span><span style=color:#8e908c>// заимствуем stream по ссылке
+</span><span>        </span><span style=color:#8959a8>let</span><span> r </span><span style=color:#3e999f>= </span><span>Read::by_ref(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut</span><span> stream);
+</span><span>        </span><span style=color:#8e908c>// пока читаем контент в никуда
+</span><span>        </span><span style=color:#8959a8>let</span><span> _content: </span><span style=color:#c99e00>Vec</span><span><</span><span style=color:#3e999f>_</span><span>> </span><span style=color:#3e999f>=</span><span> r.</span><span style=color:#4271ae>take</span><span>(size).</span><span style=color:#4271ae>bytes</span><span>().</span><span style=color:#4271ae>collect</span><span>();
+</span><span>    }
+</span><span>
+</span><span>    </span><span style=color:#8e908c>// формируем ответ
+</span><span>    </span><span style=color:#8959a8>let</span><span> hello_msg </span><span style=color:#3e999f>= </span><span style=color:#839c00>"Hello World!"</span><span>;
+</span><span>    </span><span style=color:#8959a8>let</span><span> hello_size </span><span style=color:#3e999f>=</span><span> hello_msg.</span><span style=color:#4271ae>len</span><span>();
+</span><span>    </span><span style=color:#8959a8>let </span><span style=color:#3e999f>_ = </span><span>write!(
+</span><span>        stream,
+</span><span>        </span><span style=color:#839c00>"HTTP/1.1 OK</span><span style=color:#f07219>\r\n</span><span style=color:#839c00>\
+</span><span style=color:#839c00>        host: 127.0.0.1:8000</span><span style=color:#f07219>\r\n</span><span style=color:#839c00>\
+</span><span style=color:#839c00>        server: micro-http/0.1</span><span style=color:#f07219>\r\n</span><span style=color:#839c00>\
+</span><span style=color:#839c00>        content-type: text/plain</span><span style=color:#f07219>\r\n</span><span style=color:#839c00>\
+</span><span style=color:#839c00>        content-length: </span><span>{hello_size}</span><span style=color:#f07219>\r\n\r\n</span><span style=color:#839c00>\
+</span><span style=color:#839c00>        </span><span>{hello_msg}</span><span style=color:#839c00>"
+</span><span>    );
+</span><span>}
+</span></code></pre><p>Всё, <em>Hello world</em> готов к запуску. Можете смело проверять работу в браузере!<p>Увы, но обычным <em>Hello world</em> сейчас уже никого не удивишь. Поэтому мы пойдём чуть дальше и реализуем небольшой интерактивный сайт.<p>И начнём со фронтенда.<h1 id=frontend>Фронтенд</h1><p>Я не стал с ним сильно запариваться и сделал ультра бюджетную вёрстку. Особых подробностей тут от меня не ждите — всё-таки я не очень большой мастер фронта.<p>Так что просто смотрите вёрстку/код<h3 id=site-index-html>site/index.html</h3><pre class=language-html data-lang=html style=color:#111;background-color:#f9f9f9><code class=language-html data-lang=html><span style=color:#5d9be5>&LT!</span><span style=color:#8959a8>DOCTYPE </span><span style=color:#f07219>html</span><span style=color:#5d9be5>>
+</span><span style=color:#5d9be5><</span><span style=color:#c82728>html</span><span style=color:#5d9be5>>
+</span><span style=color:#5d9be5><</span><span style=color:#c82728>head</span><span style=color:#5d9be5>>
+</span><span>  </span><span style=color:#5d9be5><</span><span style=color:#c82728>meta charset</span><span style=color:#5d9ae5>=</span><span style=color:#839c00>"utf-8"</span><span style=color:#5d9be5>>
+</span><span>  </span><span style=color:#5d9be5><</span><span style=color:#c82728>meta name</span><span style=color:#5d9ae5>=</span><span style=color:#839c00>"viewport" </span><span style=color:#c82728>content</span><span style=color:#5d9ae5>=</span><span style=color:#839c00>"width=device-width, initial-scale=1"</span><span style=color:#5d9be5>>
+</span><span>  </span><span style=color:#8e908c>&LT!-- вся статика будет отдаваться бэком -->
+</span><span>  </span><span style=color:#5d9be5><</span><span style=color:#c82728>link rel</span><span style=color:#5d9ae5>=</span><span style=color:#839c00>"stylesheet" </span><span style=color:#c82728>type</span><span style=color:#5d9ae5>=</span><span style=color:#839c00>"text/css" </span><span style=color:#c82728>href</span><span style=color:#5d9ae5>=</span><span style=color:#839c00>"/static/style.css"</span><span style=color:#5d9be5>/>
+</span><span>  </span><span style=color:#5d9be5><</span><span style=color:#c82728>link rel</span><span style=color:#5d9ae5>=</span><span style=color:#839c00>"shortcut icon" </span><span style=color:#c82728>href</span><span style=color:#5d9ae5>=</span><span style=color:#839c00>"/static/favicon.ico" </span><span style=color:#c82728>type</span><span style=color:#5d9ae5>=</span><span style=color:#839c00>"image/x-icon"</span><span style=color:#5d9be5>/>
+</span><span>  </span><span style=color:#5d9be5><</span><span style=color:#c82728>script src=</span><span style=color:#839c00>"/static/script.js"</span><span style=color:#5d9be5>>&LT/</span><span style=color:#c82728>script</span><span style=color:#5d9be5>>
+</span><span>  </span><span style=color:#5d9be5><</span><span style=color:#c82728>title</span><span style=color:#5d9be5>></span><span>ГПСЧ</span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>title</span><span style=color:#5d9be5>>
+</span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>head</span><span style=color:#5d9be5>>
+</span><span style=color:#5d9be5><</span><span style=color:#c82728>body</span><span style=color:#5d9be5>>
+</span><span>  </span><span style=color:#5d9be5><</span><span style=color:#c82728>div class</span><span style=color:#5d9ae5>=</span><span style=color:#839c00>"center"</span><span style=color:#5d9be5>>
+</span><span>    </span><span style=color:#5d9be5><</span><span style=color:#c82728>h1</span><span style=color:#5d9be5>></span><span>Генератор псевдослучайных чисел</span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>h1</span><span style=color:#5d9be5>>
+</span><span>    </span><span style=color:#5d9be5><</span><span style=color:#c82728>div class</span><span style=color:#5d9ae5>=</span><span style=color:#839c00>"item"</span><span style=color:#5d9be5>>
+</span><span>      </span><span style=color:#8e908c>&LT!-- сюда будем выводить сгенерированное число -->
+</span><span>      </span><span style=color:#5d9be5><</span><span style=color:#c82728>span class</span><span style=color:#5d9ae5>=</span><span style=color:#839c00>"current"</span><span style=color:#5d9be5>></span><span style=color:#f07219>&ampmdash;</span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>span</span><span style=color:#5d9be5>>
+</span><span>    </span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>div</span><span style=color:#5d9be5>>
+</span><span>    </span><span style=color:#5d9be5><</span><span style=color:#c82728>div class</span><span style=color:#5d9ae5>=</span><span style=color:#839c00>"item"</span><span style=color:#5d9be5>>
+</span><span>      </span><span style=color:#5d9be5><</span><span style=color:#c82728>label</span><span style=color:#5d9be5>></span><span>от</span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>label</span><span style=color:#5d9be5>>
+</span><span>      </span><span style=color:#5d9be5><</span><span style=color:#c82728>input id=</span><span style=color:#839c00>"min" </span><span style=color:#c82728>type=</span><span style=color:#839c00>"number" </span><span style=color:#c82728>value=</span><span style=color:#839c00>"1"</span><span style=color:#5d9be5>>
+</span><span>      </span><span style=color:#5d9be5><</span><span style=color:#c82728>label</span><span style=color:#5d9be5>></span><span>до</span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>label</span><span style=color:#5d9be5>>
+</span><span>      </span><span style=color:#5d9be5><</span><span style=color:#c82728>input id=</span><span style=color:#839c00>"max" </span><span style=color:#c82728>type=</span><span style=color:#839c00>"number" </span><span style=color:#c82728>value=</span><span style=color:#839c00>"10"</span><span style=color:#5d9be5>>
+</span><span>    </span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>div</span><span style=color:#5d9be5>>
+</span><span>    </span><span style=color:#5d9be5><</span><span style=color:#c82728>div class</span><span style=color:#5d9ae5>=</span><span style=color:#839c00>"item"</span><span style=color:#5d9be5>>
+</span><span>      </span><span style=color:#5d9be5><</span><span style=color:#c82728>button onclick=</span><span style=color:#839c00>"</span><span style=color:#f07219>process</span><span style=color:#4271ae>()</span><span style=color:#839c00>"</span><span style=color:#5d9be5>></span><span>Сгенерировать</span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>button</span><span style=color:#5d9be5>>
+</span><span>    </span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>div</span><span style=color:#5d9be5>>
+</span><span>  </span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>div</span><span style=color:#5d9be5>>
+</span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>body</span><span style=color:#5d9be5>>
+</span><span style=color:#5d9be5>&LT/</span><span style=color:#c82728>html</span><span style=color:#5d9be5>>
+</span></code></pre><h3 id=site-static-style-css>site/static/style.css</h3><pre class=language-css data-lang=css style=color:#111;background-color:#f9f9f9><code class=language-css data-lang=css><span style=color:#c82728>div.center </span><span>{
+</span><span>    </span><span style=color:#839c00>display</span><span>: </span><span style=color:#3e999f>block</span><span>;
+</span><span>    </span><span style=color:#839c00>margin</span><span>: </span><span style=color:#3e999f>auto</span><span>;
+</span><span>    </span><span style=color:#839c00>width</span><span>: </span><span style=color:#f07219>50%</span><span>;
+</span><span>    </span><span style=color:#839c00>text-align</span><span>: </span><span style=color:#3e999f>center</span><span>;
+</span><span>}
+</span><span>
+</span><span style=color:#c82728>div.item </span><span>{
+</span><span>    </span><span style=color:#839c00>margin</span><span>: </span><span style=color:#f07219>2em </span><span style=color:#3e999f>auto </span><span style=color:#f07219>2em </span><span style=color:#3e999f>auto</span><span>;
+</span><span>}
+</span><span>
+</span><span style=color:#c82728>span.current </span><span>{
+</span><span>    </span><span style=color:#839c00>font-size</span><span>: </span><span style=color:#f07219>100px</span><span>;
+</span><span>    </span><span style=color:#839c00>font-weight</span><span>: </span><span style=color:#3e999f>bold</span><span>;
+</span><span>}
+</span><span>
+</span><span style=color:#c82728>label </span><span>{
+</span><span>    </span><span style=color:#839c00>font-size</span><span>: </span><span style=color:#f07219>16px</span><span>;
+</span><span>}
+</span><span>
+</span><span style=color:#c82728>h1 </span><span>{
+</span><span>    </span><span style=color:#839c00>font-size</span><span>: </span><span style=color:#f07219>24px</span><span>;
+</span><span>    </span><span style=color:#839c00>font-weight</span><span>: </span><span style=color:#3e999f>normal</span><span>;
+</span><span>}
+</span><span>
+</span><span style=color:#c82728>input </span><span>{
+</span><span>    </span><span style=color:#839c00>font-size</span><span>: </span><span style=color:#f07219>16px</span><span>;
+</span><span>    </span><span style=color:#839c00>max-width</span><span>: </span><span style=color:#f07219>100px</span><span>;
+</span><span>    </span><span style=color:#839c00>text-align</span><span>: </span><span style=color:#3e999f>center</span><span>;
+</span><span>}
+</span><span>
+</span><span style=color:#c82728>button </span><span>{
+</span><span>    </span><span style=color:#839c00>font-size</span><span>: </span><span style=color:#3e999f>large</span><span>;
+</span><span>    </span><span style=color:#839c00>min-width</span><span>: </span><span style=color:#f07219>200px</span><span>;
+</span><span>    </span><span style=color:#839c00>min-height</span><span>: </span><span style=color:#f07219>50px</span><span>;
+</span><span>}
+</span><span>
+</span></code></pre><h3 id=site-static-script-js>site/static/script.js</h3><pre class=language-js data-lang=js style=color:#111;background-color:#f9f9f9><code class=language-js data-lang=js><span style=color:#8959a8>function </span><span style=color:#4271ae>process</span><span>() {
+</span><span>  </span><span style=color:#4271ae>fetch</span><span>(</span><span style=color:#839c00>"/api/"</span><span>, {
+</span><span>    method: </span><span style=color:#839c00>"POST"</span><span>,
+</span><span>    body: </span><span style=color:#f07219>JSON</span><span style=color:#4271ae>.stringify</span><span>({
+</span><span>      </span><span style=color:#8e908c>// будем указывать в каком диапазоне генерировать новое число
+</span><span>      min: </span><span style=color:#4271ae>document.querySelector</span><span>(</span><span style=color:#839c00>"input[id=min]"</span><span>).value,
+</span><span>      max: </span><span style=color:#4271ae>document.querySelector</span><span>(</span><span style=color:#839c00>"input[id=max]"</span><span>).value
+</span><span>    }),
+</span><span>    headers: {
+</span><span>      </span><span style=color:#839c00>"Content-Type"</span><span>: </span><span style=color:#839c00>"application/json"
+</span><span>    }
+</span><span>  })
+</span><span>  </span><span style=color:#4271ae>.then</span><span>((</span><span style=color:#f07219>response</span><span>) </span><span style=color:#8959a8>=> </span><span style=color:#c82728>response</span><span style=color:#4271ae>.json</span><span>())
+</span><span>  </span><span style=color:#4271ae>.then</span><span>((</span><span style=color:#f07219>json</span><span>) </span><span style=color:#8959a8>=> </span><span>{
+</span><span>    </span><span style=color:#8e908c>// и забьём на обработку ошибок
+</span><span>    </span><span style=color:#4271ae>document.querySelector</span><span>(</span><span style=color:#839c00>"span[class=current]"</span><span>).</span><span style=color:#c82728>textContent </span><span style=color:#3e999f>= </span><span style=color:#c82728>json</span><span>.</span><span style=color:#c82728>result</span><span>;
+</span><span>  });
+</span><span>}
+</span></code></pre><p>Как вы уже наверное поняли я выбрал в качестве демки генератор псевдослучайных чисел с генерацией на бэке.<p>На этом с фронтовой частью закончили. Теперь переходим к <strong><em>мясу</em></strong>!<h1 id=bekend>Бэкенд</h1><p>Реализованный <strong>Hello world</strong> конечно нам поможет, но тут стоит очень сильно переработать весь интерфейс.<p>Код будем разделять на модули. Как и ранее пойдём от логики нашего приложения и постепенно будем заполнять пустоты.<h3 id=src-main-rs>src/main.rs</h3><pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8e908c>// это наша библиотека
+</span><span style=color:#8959a8>extern crate</span><span> micro_http;
+</span><span>
+</span><span style=color:#8e908c>// с большим числом вспомогательных элементов
+</span><span style=color:#8959a8>use </span><span>micro_http::app::App;
+</span><span style=color:#8959a8>use </span><span>micro_http::file;
+</span><span style=color:#8959a8>use </span><span>micro_http::http::{Data, Method};
+</span><span style=color:#8959a8>use </span><span>micro_http::json::{</span><span style=color:#c82728>self</span><span>, SimpleJson};
+</span><span style=color:#8959a8>use </span><span>micro_http::random::Random;
+</span><span style=color:#8959a8>use </span><span>micro_http::status::StatusCode;
+</span><span>
+</span><span style=color:#8e908c>// наша апишечка
+</span><span style=color:#8959a8>fn </span><span style=color:#4271ae>api</span><span>(</span><span style=color:#f07219>request</span><span>: Data) -> Data {
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>process</span><span>(</span><span style=color:#f07219>request</span><span>: Data) -> </span><span style=color:#c99e00>Option</span><span>&LTData> {
+</span><span>        </span><span style=color:#8e908c>// если пришёл json
+</span><span>        </span><span style=color:#8959a8>let</span><span> data </span><span style=color:#3e999f>=</span><span> request.content.</span><span style=color:#4271ae>and_then</span><span>(|</span><span style=color:#f07219>c</span><span>| json::deserialize(</span><span style=color:#3e999f>&</span><span>c))</span><span style=color:#3e999f>?</span><span>;
+</span><span>        </span><span style=color:#8e908c>// то получаем из него необходимые поля
+</span><span>        </span><span style=color:#8959a8>let</span><span> minv </span><span style=color:#3e999f>=</span><span> data.</span><span style=color:#4271ae>get</span><span>(</span><span style=color:#839c00>"min"</span><span>).</span><span style=color:#4271ae>cloned</span><span>().</span><span style=color:#4271ae>and_then</span><span>(|</span><span style=color:#f07219>d</span><span>| d.</span><span style=color:#4271ae>parse</span><span>().</span><span style=color:#4271ae>ok</span><span>())</span><span style=color:#3e999f>?</span><span>;
+</span><span>        </span><span style=color:#8959a8>let</span><span> maxv </span><span style=color:#3e999f>=</span><span> data.</span><span style=color:#4271ae>get</span><span>(</span><span style=color:#839c00>"max"</span><span>).</span><span style=color:#4271ae>cloned</span><span>().</span><span style=color:#4271ae>and_then</span><span>(|</span><span style=color:#f07219>d</span><span>| d.</span><span style=color:#4271ae>parse</span><span>().</span><span style=color:#4271ae>ok</span><span>())</span><span style=color:#3e999f>?</span><span>;
+</span><span>
+</span><span>        </span><span style=color:#8e908c>// сгенерируем псевдослучайное число
+</span><span>        </span><span style=color:#8959a8>let</span><span> result </span><span style=color:#3e999f>= </span><span>Random::new().</span><span style=color:#4271ae>in_range</span><span>(minv, maxv);
+</span><span>
+</span><span>        </span><span style=color:#8e908c>// упакуем ответ в HashMap
+</span><span>        </span><span style=color:#8959a8>let mut</span><span> data </span><span style=color:#3e999f>= </span><span>SimpleJson::new();
+</span><span>        data.</span><span style=color:#4271ae>insert</span><span>(</span><span style=color:#839c00>"result"</span><span>.</span><span style=color:#4271ae>to_string</span><span>(), result.</span><span style=color:#4271ae>to_string</span><span>());
+</span><span>
+</span><span>        </span><span style=color:#8e908c>// сериализуем и отдаём
+</span><span>        </span><span style=color:#c99e00>Some</span><span>(json::serialize(data))
+</span><span>    }
+</span><span>
+</span><span>    </span><span style=color:#8959a8>match </span><span style=color:#4271ae>process</span><span>(request) {
+</span><span>        </span><span style=color:#c99e00>Some</span><span>(r) </span><span style=color:#3e999f>=></span><span> r,
+</span><span>        </span><span style=color:#8e908c>// если есть любой косяк, то это Bad Request
+</span><span>        </span><span style=color:#c99e00>None </span><span style=color:#3e999f>=> </span><span>Data::from_status(StatusCode::BadRequest),
+</span><span>    }
+</span><span>}
+</span><span>
+</span><span style=color:#8959a8>fn </span><span style=color:#4271ae>main</span><span>() {
+</span><span>    </span><span style=color:#8e908c>// инициализируем нашку апку
+</span><span>    </span><span style=color:#8959a8>let mut</span><span> app </span><span style=color:#3e999f>= </span><span>App::new(</span><span style=color:#839c00>"127.0.0.1"</span><span>, </span><span style=color:#f07219>8000</span><span>);
+</span><span>    </span><span style=color:#8e908c>// забиндим index и будем отдавать по нему index.html
+</span><span>    app.</span><span style=color:#4271ae>bind</span><span>(</span><span style=color:#839c00>"/"</span><span>, Method::GET, |_| file::response(</span><span style=color:#839c00>"./site/index.html"</span><span>));
+</span><span>    </span><span style=color:#8e908c>// выделим роут для статики (css, js, ico)
+</span><span>    app.</span><span style=color:#4271ae>bind</span><span>(</span><span style=color:#839c00>"/static/"</span><span>, Method::GET, |</span><span style=color:#f07219>r</span><span>| file::response(</span><span style=color:#3e999f>&</span><span>format!(</span><span style=color:#839c00>"./site</span><span>{}</span><span style=color:#839c00>"</span><span>, r.url)));
+</span><span>    </span><span style=color:#8e908c>// роут для апишечки
+</span><span>    app.</span><span style=color:#4271ae>bind</span><span>(</span><span style=color:#839c00>"/api/"</span><span>, Method::POST, api);
+</span><span>    </span><span style=color:#8e908c>// запускаем сервер
+</span><span>    app.</span><span style=color:#4271ae>run</span><span>();
+</span><span>}
+</span></code></pre><p>Теперь когда основа заложена, то стоит переходить к отдельным частям.<p>Давайте сразу их и обозначим:<ul><li>Роутинг запросов<li>Многопоточная реализация<li>Сериализация/десериализация json<li>Обработка ошибок<li>Генерация псевдослучайных чисел</ul><p>Вообще для удобства сразу определим наши модули.<h3 id=src-lib-rs>src/lib.rs</h3><pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>pub mod </span><span>app;
+</span><span style=color:#8959a8>pub mod </span><span>error;
+</span><span style=color:#8959a8>pub mod </span><span>file;
+</span><span style=color:#8959a8>pub mod </span><span>http;
+</span><span style=color:#8959a8>pub mod </span><span>json;
+</span><span style=color:#8959a8>pub mod </span><span>random;
+</span><span style=color:#8959a8>pub mod </span><span>read; </span><span style=color:#8e908c>// тут у нас until_crlf, ранее read_until_crlf
+</span><span style=color:#8959a8>pub mod </span><span>status;
+</span></code></pre><p>Ну а теперь далее к реализации!<h3 id=src-error-rs>src/error.rs</h3><pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8e908c>// вообще хорошим тоном будет определить модуль с ошибками
+</span><span style=color:#8e908c>// хотя всегда есть такие крейты как anyhow и thiserror, которые упрощают обработку ошибок
+</span><span>
+</span><span style=color:#8959a8>use </span><span>std::error;
+</span><span style=color:#8959a8>use </span><span>std::fmt;
+</span><span style=color:#8959a8>use </span><span>std::io;
+</span><span style=color:#8959a8>use </span><span>std::string;
+</span><span>
+</span><span style=color:#8e908c>// мы же тут определим всё вручную
+</span><span>#[</span><span style=color:#c82728>derive</span><span>(Debug)]
+</span><span style=color:#8959a8>pub enum </span><span>FrameworkError {
+</span><span>    </span><span style=color:#8e908c>// для операций с файлами
+</span><span>    Io(io::Error),
+</span><span>    </span><span style=color:#8e908c>// для парсинга строк
+</span><span>    Utf(string::FromUtf8Error),
+</span><span>    </span><span style=color:#8e908c>// Косяки парсинга заголовка
+</span><span>    HeaderParse,
+</span><span>    HeaderData,
+</span><span>}
+</span><span>
+</span><span style=color:#8e908c>// реализуем проброс ошибок необходимый при размотке, так как вложенность может быть любой
+</span><span style=color:#8959a8>impl </span><span>error::Error </span><span style=color:#8959a8>for </span><span>FrameworkError {
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>source</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#f07219>self</span><span>) -> </span><span style=color:#c99e00>Option</span><span><</span><span style=color:#3e999f>&</span><span>(dyn error::Error + </span><span style=color:#8959a8>'static</span><span>)> {
+</span><span>        </span><span style=color:#8959a8>match </span><span style=color:#c82728>self </span><span>{
+</span><span>            </span><span style=color:#8e908c>// эти вложенные
+</span><span>            FrameworkError::Io(e) </span><span style=color:#3e999f>=> </span><span style=color:#c99e00>Some</span><span>(e),
+</span><span>            FrameworkError::Utf(e) </span><span style=color:#3e999f>=> </span><span style=color:#c99e00>Some</span><span>(e),
+</span><span>            </span><span style=color:#8e908c>// а эти нет
+</span><span>            FrameworkError::HeaderParse </span><span style=color:#3e999f>=> </span><span style=color:#c99e00>None</span><span>,
+</span><span>            FrameworkError::HeaderData </span><span style=color:#3e999f>=> </span><span style=color:#c99e00>None</span><span>,
+</span><span>        }
+</span><span>    }
+</span><span>}
+</span><span>
+</span><span style=color:#8e908c>// человеко-читаемые ошибки
+</span><span style=color:#8959a8>impl </span><span>fmt::Display </span><span style=color:#8959a8>for </span><span>FrameworkError {
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>fmt</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>f</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut </span><span>fmt::Formatter<'</span><span style=color:#3e999f>_</span><span>>) -> fmt::Result {
+</span><span>        </span><span style=color:#8959a8>match </span><span style=color:#c82728>self </span><span>{
+</span><span>            FrameworkError::Io(e) </span><span style=color:#3e999f>=> </span><span>write!(f, </span><span style=color:#839c00>"IO Error: </span><span>{}</span><span style=color:#839c00>"</span><span>, e),
+</span><span>            FrameworkError::Utf(e) </span><span style=color:#3e999f>=> </span><span>write!(f, </span><span style=color:#839c00>"UTF8 Error: </span><span>{}</span><span style=color:#839c00>"</span><span>, e),
+</span><span>            FrameworkError::HeaderParse </span><span style=color:#3e999f>=> </span><span>write!(f, </span><span style=color:#839c00>"Parse header error"</span><span>),
+</span><span>            FrameworkError::HeaderData </span><span style=color:#3e999f>=> </span><span>write!(f, </span><span style=color:#839c00>"Get data from header error"</span><span>),
+</span><span>        }
+</span><span>    }
+</span><span>}
+</span><span>
+</span><span style=color:#8e908c>// и поддержка From (+ Into на халяву)
+</span><span style=color:#8959a8>impl </span><span style=color:#c99e00>From</span><span>&LTio::Error> </span><span style=color:#8959a8>for </span><span>FrameworkError {
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>from</span><span>(</span><span style=color:#f07219>e</span><span>: io::Error) -> </span><span style=color:#8959a8>Self </span><span>{
+</span><span>        </span><span style=color:#8959a8>Self</span><span>::Io(e)
+</span><span>    }
+</span><span>}
+</span><span>
+</span><span style=color:#8959a8>impl </span><span style=color:#c99e00>From</span><span>&LTstring::FromUtf8Error> </span><span style=color:#8959a8>for </span><span>FrameworkError {
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>from</span><span>(</span><span style=color:#f07219>e</span><span>: string::FromUtf8Error) -> </span><span style=color:#8959a8>Self </span><span>{
+</span><span>        </span><span style=color:#8959a8>Self</span><span>::Utf(e)
+</span><span>    }
+</span><span>}
+</span></code></pre><h3 id=src-status-rs>src/status.rs</h3><pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>use </span><span>std::fmt;
+</span><span>
+</span><span style=color:#8e908c>// будем поддерживать только необходимые нам статусы
+</span><span>#[</span><span style=color:#c82728>derive</span><span>(Debug, Copy, Clone, PartialEq, Eq, Default)]
+</span><span style=color:#8959a8>pub enum </span><span>StatusCode {
+</span><span>    #[</span><span style=color:#c82728>default</span><span>]
+</span><span>    </span><span style=color:#c99e00>Ok </span><span style=color:#3e999f>= </span><span style=color:#f07219>200</span><span>,
+</span><span>    BadRequest </span><span style=color:#3e999f>= </span><span style=color:#f07219>400</span><span>,
+</span><span>    NotFound </span><span style=color:#3e999f>= </span><span style=color:#f07219>404</span><span>,
+</span><span>    MethodNotAllowed </span><span style=color:#3e999f>= </span><span style=color:#f07219>405</span><span>,
+</span><span>    ServerError </span><span style=color:#3e999f>= </span><span style=color:#f07219>500</span><span>,
+</span><span>}
+</span><span>
+</span><span style=color:#8e908c>// и преобразование статуса в строку
+</span><span style=color:#8959a8>impl </span><span>fmt::Display </span><span style=color:#8959a8>for </span><span>StatusCode {
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>fmt</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>f</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut </span><span>fmt::Formatter<'</span><span style=color:#3e999f>_</span><span>>) -> fmt::Result {
+</span><span>        </span><span style=color:#8959a8>use </span><span>StatusCode::</span><span style=color:#3e999f>*</span><span>;
+</span><span>        write!(
+</span><span>            f,
+</span><span>            </span><span style=color:#839c00>"</span><span>{} {}</span><span style=color:#839c00>"</span><span>,
+</span><span>            </span><span style=color:#3e999f>*</span><span style=color:#c82728>self </span><span style=color:#3e999f>as </span><span style=color:#8959a8>u16</span><span>,
+</span><span>            </span><span style=color:#8959a8>match </span><span style=color:#c82728>self </span><span>{
+</span><span>                </span><span style=color:#c99e00>Ok </span><span style=color:#3e999f>=> </span><span style=color:#839c00>"OK"</span><span>,
+</span><span>                BadRequest </span><span style=color:#3e999f>=> </span><span style=color:#839c00>"Bad Request"</span><span>,
+</span><span>                NotFound </span><span style=color:#3e999f>=> </span><span style=color:#839c00>"Not Found"</span><span>,
+</span><span>                MethodNotAllowed </span><span style=color:#3e999f>=> </span><span style=color:#839c00>"Method Not Allowed"</span><span>,
+</span><span>                ServerError </span><span style=color:#3e999f>=> </span><span style=color:#839c00>"Internal Server Error"</span><span>,
+</span><span>            }
+</span><span>        )
+</span><span>    }
+</span><span>}
+</span></code></pre><h3 id=src-http-rs>src/http.rs</h3><pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>use </span><span>std::fmt;
+</span><span style=color:#8959a8>use </span><span>std::{collections::HashMap, io::Read, net::SocketAddr};
+</span><span>
+</span><span style=color:#8959a8>use crate</span><span>::error::FrameworkError;
+</span><span style=color:#8959a8>use crate</span><span>::read;
+</span><span style=color:#8959a8>use crate</span><span>::status::StatusCode;
+</span><span>
+</span><span style=color:#8e908c>// вообще методы могут быть любые, так как стандарт это разрешает
+</span><span style=color:#8e908c>// но мы ограничимся только эти набором
+</span><span>#[</span><span style=color:#c82728>derive</span><span>(Eq, PartialEq, Copy, Clone, Debug, Default)]
+</span><span style=color:#8959a8>pub enum </span><span>Method {
+</span><span>    CONNECT,
+</span><span>    DELETE,
+</span><span>    GET,
+</span><span>    HEAD,
+</span><span>    OPTIONS,
+</span><span>    PATCH,
+</span><span>    POST,
+</span><span>    PUT,
+</span><span>    TRACE,
+</span><span>    </span><span style=color:#8e908c>// любые другие методы
+</span><span>    #[</span><span style=color:#c82728>default</span><span>]
+</span><span>    UNKNOWN,
+</span><span>}
+</span><span>
+</span><span>#[</span><span style=color:#c82728>derive</span><span>(Default)]
+</span><span style=color:#8959a8>pub struct </span><span>Data {
+</span><span>    </span><span style=color:#8e908c>// тут вообще multi map должен быть, но как-то пофиг
+</span><span>    </span><span style=color:#8959a8>pub </span><span style=color:#c82728>headers</span><span>: HashMap<</span><span style=color:#c99e00>String</span><span>, </span><span style=color:#c99e00>String</span><span>>,
+</span><span>    </span><span style=color:#8959a8>pub </span><span style=color:#c82728>content</span><span>: </span><span style=color:#c99e00>Option</span><span><</span><span style=color:#c99e00>Vec</span><span><</span><span style=color:#8959a8>u8</span><span>>>,
+</span><span>    </span><span style=color:#8959a8>pub </span><span style=color:#c82728>addr</span><span>: </span><span style=color:#c99e00>Option</span><span>&LTSocketAddr>,
+</span><span>    </span><span style=color:#8959a8>pub </span><span style=color:#c82728>url</span><span>: String,
+</span><span>    </span><span style=color:#8959a8>pub </span><span style=color:#c82728>method</span><span>: Method,
+</span><span>    </span><span style=color:#8959a8>pub </span><span style=color:#c82728>status_code</span><span>: StatusCode,
+</span><span>}
+</span><span>
+</span><span style=color:#8959a8>impl </span><span>Data {
+</span><span>    </span><span style=color:#8e908c>// немного вспомогательных методов
+</span><span>    </span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>new</span><span>() -> Data {
+</span><span>        Data::default()
+</span><span>    }
+</span><span>
+</span><span>    </span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>from_status</span><span>(</span><span style=color:#f07219>status</span><span>: StatusCode) -> Data {
+</span><span>        Data { status_code: status, </span><span style=color:#3e999f>..</span><span style=color:#c99e00>Default</span><span>::default() }
+</span><span>    }
+</span><span>
+</span><span>    </span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>from_content</span><span>&LTM: </span><span style=color:#c99e00>Into</span><span><</span><span style=color:#c99e00>String</span><span>>, C: </span><span style=color:#c99e00>Into</span><span><</span><span style=color:#c99e00>Vec</span><span><</span><span style=color:#8959a8>u8</span><span>>>>(</span><span style=color:#f07219>mime_type</span><span>: M, </span><span style=color:#f07219>content</span><span>: C) -> Data {
+</span><span>        </span><span style=color:#8959a8>let mut</span><span> data </span><span style=color:#3e999f>= </span><span>Data::new();
+</span><span>        </span><span style=color:#8959a8>let</span><span> content </span><span style=color:#3e999f>=</span><span> content.</span><span style=color:#4271ae>into</span><span>();
+</span><span>        data.</span><span style=color:#4271ae>add_header</span><span>(</span><span style=color:#839c00>"content-type"</span><span>, mime_type.</span><span style=color:#4271ae>into</span><span>());
+</span><span>        data.</span><span style=color:#4271ae>add_header</span><span>(</span><span style=color:#839c00>"content-length"</span><span>, content.</span><span style=color:#4271ae>len</span><span>());
+</span><span>        data.content </span><span style=color:#3e999f>= </span><span style=color:#c99e00>Some</span><span>(content);
+</span><span>        data
+</span><span>    }
+</span><span>
+</span><span>    </span><span style=color:#8e908c>// парсинг теперь идёт в два этапа
+</span><span>    </span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>parse</span><span>&LTR: Read>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>r</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut</span><span> R) -> </span><span style=color:#c99e00>Result</span><span><(), FrameworkError> {
+</span><span>        </span><span style=color:#c82728>self</span><span>.</span><span style=color:#4271ae>parse_header</span><span>(r)</span><span style=color:#3e999f>?</span><span>;
+</span><span>        </span><span style=color:#c82728>self</span><span>.</span><span style=color:#4271ae>parse_content</span><span>(r)</span><span style=color:#3e999f>?</span><span>;
+</span><span>        </span><span style=color:#c99e00>Ok</span><span>(())
+</span><span>    }
+</span><span>
+</span><span>    </span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>add_header</span><span>&LTK, V>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>key</span><span>: K, </span><span style=color:#f07219>value</span><span>: V)
+</span><span>    </span><span style=color:#8959a8>where
+</span><span>        K: fmt::Display,
+</span><span>        V: fmt::Display,
+</span><span>    {
+</span><span>        </span><span style=color:#8e908c>// все ключи будут в нижнем регистре
+</span><span>        </span><span style=color:#c82728>self</span><span>.headers.</span><span style=color:#4271ae>insert</span><span>(key.</span><span style=color:#4271ae>to_string</span><span>().</span><span style=color:#4271ae>to_lowercase</span><span>(), value.</span><span style=color:#4271ae>to_string</span><span>());
+</span><span>    }
+</span><span>
+</span><span>    </span><span style=color:#8e908c>// парсинг заголовка, который ранее уже описывал
+</span><span>    </span><span style=color:#8e908c>// тут только добавилась обработка ошибок
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>parse_header</span><span>&LTR: Read>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>r</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut</span><span> R) -> </span><span style=color:#c99e00>Result</span><span><(), FrameworkError> {
+</span><span>        </span><span style=color:#8959a8>let</span><span> buffer </span><span style=color:#3e999f>= </span><span>read::until_crlf(r)</span><span style=color:#3e999f>?</span><span>;
+</span><span>        </span><span style=color:#8959a8>let mut</span><span> iterator </span><span style=color:#3e999f>=</span><span> buffer.</span><span style=color:#4271ae>split</span><span>(</span><span style=color:#839c00>"</span><span style=color:#f07219>\r\n</span><span style=color:#839c00>"</span><span>);
+</span><span>
+</span><span>        </span><span style=color:#8959a8>let</span><span> header: </span><span style=color:#c99e00>Vec</span><span><</span><span style=color:#3e999f>_</span><span>> </span><span style=color:#3e999f>=</span><span> iterator.</span><span style=color:#4271ae>next</span><span>().</span><span style=color:#4271ae>ok_or</span><span>(FrameworkError::HeaderParse)</span><span style=color:#3e999f>?</span><span>.</span><span style=color:#4271ae>split</span><span>(</span><span style=color:#839c00>' '</span><span>).</span><span style=color:#4271ae>collect</span><span>();
+</span><span>        </span><span style=color:#c82728>self</span><span>.method </span><span style=color:#3e999f>= </span><span>Method::from(header[</span><span style=color:#f07219>0</span><span>]);
+</span><span>        </span><span style=color:#c82728>self</span><span>.url </span><span style=color:#3e999f>=</span><span> header[</span><span style=color:#f07219>1</span><span>].</span><span style=color:#4271ae>to_string</span><span>();
+</span><span>
+</span><span>        </span><span style=color:#8959a8>for</span><span> line </span><span style=color:#3e999f>in</span><span> iterator {
+</span><span>            </span><span style=color:#8959a8>if</span><span> line.</span><span style=color:#4271ae>trim</span><span>().</span><span style=color:#4271ae>is_empty</span><span>() {
+</span><span>                </span><span style=color:#8959a8>continue</span><span>;
+</span><span>            }
+</span><span>            </span><span style=color:#8959a8>let </span><span>(key, value) </span><span style=color:#3e999f>=</span><span> line.</span><span style=color:#4271ae>split_once</span><span>(</span><span style=color:#839c00>':'</span><span>).</span><span style=color:#4271ae>ok_or</span><span>(FrameworkError::HeaderParse)</span><span style=color:#3e999f>?</span><span>;
+</span><span>            </span><span style=color:#c82728>self</span><span>.</span><span style=color:#4271ae>add_header</span><span>(key.</span><span style=color:#4271ae>trim</span><span>(), value[</span><span style=color:#f07219>1</span><span style=color:#3e999f>..</span><span>].</span><span style=color:#4271ae>trim</span><span>());
+</span><span>        }
+</span><span>
+</span><span>        </span><span style=color:#c99e00>Ok</span><span>(())
+</span><span>    }
+</span><span>
+</span><span>    </span><span style=color:#8e908c>// и парсинг контента, если нужно
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>parse_content</span><span>&LTR: Read>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>r</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut</span><span> R) -> </span><span style=color:#c99e00>Result</span><span><(), FrameworkError> {
+</span><span>        </span><span style=color:#8959a8>if </span><span style=color:#c82728>self</span><span>.headers.</span><span style=color:#4271ae>contains_key</span><span>(</span><span style=color:#839c00>"content-length"</span><span>) {
+</span><span>            </span><span style=color:#8959a8>let</span><span> size: </span><span style=color:#8959a8>u64 </span><span style=color:#3e999f>= </span><span style=color:#c82728>self
+</span><span>                .headers
+</span><span>                .</span><span style=color:#4271ae>get</span><span>(</span><span style=color:#839c00>"content-length"</span><span>)
+</span><span>                .</span><span style=color:#4271ae>ok_or</span><span>(FrameworkError::HeaderData)</span><span style=color:#3e999f>?
+</span><span>                .</span><span style=color:#4271ae>parse</span><span>()
+</span><span>                .</span><span style=color:#4271ae>map_err</span><span>(|_| FrameworkError::HeaderData)</span><span style=color:#3e999f>?</span><span>;
+</span><span>            </span><span style=color:#8959a8>let mut</span><span> content </span><span style=color:#3e999f>= </span><span style=color:#c99e00>String</span><span>::with_capacity(size </span><span style=color:#3e999f>as </span><span style=color:#8959a8>usize</span><span>);
+</span><span>            </span><span style=color:#8959a8>let</span><span> r </span><span style=color:#3e999f>= </span><span>Read::by_ref(r);
+</span><span>            </span><span style=color:#8959a8>let </span><span style=color:#3e999f>_ =</span><span> r.</span><span style=color:#4271ae>take</span><span>(size).</span><span style=color:#4271ae>read_to_string</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut</span><span> content);
+</span><span>            </span><span style=color:#c82728>self</span><span>.content </span><span style=color:#3e999f>= </span><span style=color:#c99e00>Some</span><span>(content.</span><span style=color:#4271ae>into</span><span>());
+</span><span>        }
+</span><span>        </span><span style=color:#c99e00>Ok</span><span>(())
+</span><span>    }
+</span><span>
+</span><span>    </span><span style=color:#8e908c>// также не забываем про сериализацию заголовка для ответа
+</span><span>    </span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>render_headers</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#f07219>self</span><span>) -> String {
+</span><span>        </span><span style=color:#8959a8>let mut</span><span> buf </span><span style=color:#3e999f>= </span><span style=color:#c99e00>String</span><span>::new();
+</span><span>        </span><span style=color:#8959a8>for </span><span>(k, v) </span><span style=color:#3e999f>in &</span><span style=color:#c82728>self</span><span>.headers {
+</span><span>            buf.</span><span style=color:#4271ae>push_str</span><span>(</span><span style=color:#3e999f>&</span><span>format!(</span><span style=color:#839c00>"</span><span>{k}</span><span style=color:#839c00>: </span><span>{v}</span><span style=color:#f07219>\r\n</span><span style=color:#839c00>"</span><span>));
+</span><span>        }
+</span><span>        buf
+</span><span>    }
+</span><span>}
+</span><span>
+</span><span style=color:#8e908c>// парсинг метода, лодку мне!
+</span><span style=color:#8959a8>impl </span><span style=color:#c99e00>From</span><span><</span><span style=color:#3e999f>&</span><span style=color:#8959a8>str</span><span>> </span><span style=color:#8959a8>for </span><span>Method {
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>from</span><span>(</span><span style=color:#f07219>value</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>str</span><span>) -> </span><span style=color:#8959a8>Self </span><span>{
+</span><span>        </span><span style=color:#8959a8>use </span><span>Method::</span><span style=color:#3e999f>*</span><span>;
+</span><span>        </span><span style=color:#8959a8>match</span><span> value {
+</span><span>            </span><span style=color:#839c00>"CONNECT" </span><span style=color:#3e999f>=> </span><span>CONNECT,
+</span><span>            </span><span style=color:#839c00>"DELETE" </span><span style=color:#3e999f>=> </span><span>DELETE,
+</span><span>            </span><span style=color:#839c00>"GET" </span><span style=color:#3e999f>=> </span><span>GET,
+</span><span>            </span><span style=color:#839c00>"HEAD" </span><span style=color:#3e999f>=> </span><span>HEAD,
+</span><span>            </span><span style=color:#839c00>"OPTIONS" </span><span style=color:#3e999f>=> </span><span>OPTIONS,
+</span><span>            </span><span style=color:#839c00>"PATCH" </span><span style=color:#3e999f>=> </span><span>PATCH,
+</span><span>            </span><span style=color:#839c00>"POST" </span><span style=color:#3e999f>=> </span><span>POST,
+</span><span>            </span><span style=color:#839c00>"PUT" </span><span style=color:#3e999f>=> </span><span>PUT,
+</span><span>            </span><span style=color:#839c00>"TRACE" </span><span style=color:#3e999f>=> </span><span>TRACE,
+</span><span>            </span><span style=color:#3e999f>_ => </span><span>UNKNOWN,
+</span><span>        }
+</span><span>    }
+</span><span>}
+</span></code></pre><h3 id=src-app-rs>src/app.rs</h3><pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>use </span><span>std::io::Write;
+</span><span style=color:#8959a8>use </span><span>std::net::{TcpListener, TcpStream};
+</span><span style=color:#8959a8>use </span><span>std::thread;
+</span><span style=color:#8959a8>use </span><span>std::time::{Duration, SystemTime};
+</span><span>
+</span><span style=color:#8959a8>use crate</span><span>::error::FrameworkError;
+</span><span style=color:#8959a8>use crate</span><span>::http::{Data, Method};
+</span><span style=color:#8959a8>use crate</span><span>::status::StatusCode;
+</span><span>
+</span><span style=color:#8e908c>// чуток упрощаем себе жизнь определяя псевдоним
+</span><span style=color:#8959a8>type </span><span>RouteFunc </span><span style=color:#3e999f>= </span><span style=color:#8959a8>fn</span><span>(Data) -> Data;
+</span><span>
+</span><span style=color:#8e908c>// структура для хранения наших роутов
+</span><span>#[</span><span style=color:#c82728>derive</span><span>(Clone)]
+</span><span style=color:#8959a8>struct </span><span>Route {
+</span><span>    </span><span style=color:#c82728>url</span><span>: String,
+</span><span>    </span><span style=color:#c82728>method</span><span>: Method,
+</span><span>    </span><span style=color:#c82728>func</span><span>: RouteFunc,
+</span><span>}
+</span><span>
+</span><span style=color:#8e908c>// и самого приложения
+</span><span>#[</span><span style=color:#c82728>derive</span><span>(Clone)]
+</span><span style=color:#8959a8>pub struct </span><span>App {
+</span><span>    </span><span style=color:#c82728>host</span><span>: String,
+</span><span>    </span><span style=color:#c82728>port</span><span>: </span><span style=color:#8959a8>u16</span><span>,
+</span><span>    </span><span style=color:#c82728>routes</span><span>: </span><span style=color:#c99e00>Vec</span><span>&LTRoute>,
+</span><span>}
+</span><span>
+</span><span style=color:#8959a8>impl </span><span>App {
+</span><span>    </span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>new</span><span>(</span><span style=color:#f07219>host</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>str</span><span>, </span><span style=color:#f07219>port</span><span>: </span><span style=color:#8959a8>u16</span><span>) -> App {
+</span><span>        App { routes: </span><span style=color:#c99e00>Vec</span><span>::new(), host: host.</span><span style=color:#4271ae>to_string</span><span>(), port }
+</span><span>    }
+</span><span>
+</span><span>    </span><span style=color:#8e908c>// просто собираем роуты в список
+</span><span>    </span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>bind</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>url</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>str</span><span>, </span><span style=color:#f07219>method</span><span>: Method, </span><span style=color:#f07219>func</span><span>: RouteFunc) {
+</span><span>        </span><span style=color:#c82728>self</span><span>.routes.</span><span style=color:#4271ae>push</span><span>(Route { url: url.</span><span style=color:#4271ae>to_string</span><span>(), method, func })
+</span><span>    }
+</span><span>
+</span><span>    </span><span style=color:#8e908c>// а вот тут уже идёт сам роутинг
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>route</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>url</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>str</span><span>, </span><span style=color:#f07219>method</span><span>: Method) -> </span><span style=color:#c99e00>Option</span><span><</span><span style=color:#3e999f>&</span><span>Route> {
+</span><span>        </span><span style=color:#8e908c>// длина общих частей между двумя строками
+</span><span>        </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>sublength</span><span>(</span><span style=color:#f07219>text</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>str</span><span>, </span><span style=color:#f07219>subtext</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>str</span><span>) -> </span><span style=color:#8959a8>usize </span><span>{
+</span><span>            text.</span><span style=color:#4271ae>chars</span><span>().</span><span style=color:#4271ae>zip</span><span>(subtext.</span><span style=color:#4271ae>chars</span><span>()).</span><span style=color:#4271ae>take_while</span><span>(|(</span><span style=color:#f07219>a</span><span>, </span><span style=color:#f07219>b</span><span>)| a </span><span style=color:#3e999f>==</span><span> b).</span><span style=color:#4271ae>count</span><span>()
+</span><span>        }
+</span><span>
+</span><span>        </span><span style=color:#8959a8>let mut</span><span> founded </span><span style=color:#3e999f>= </span><span style=color:#c99e00>None</span><span>;
+</span><span>        </span><span style=color:#8959a8>let mut</span><span> max_len </span><span style=color:#3e999f>= </span><span style=color:#f07219>0</span><span>;
+</span><span>
+</span><span>        </span><span style=color:#8e908c>// ищем подходящий роут, который совпадает с запрашиваемым
+</span><span>        </span><span style=color:#8e908c>// ориентируемся на максимальную длину общей части
+</span><span>        </span><span style=color:#8959a8>for</span><span> route </span><span style=color:#3e999f>in &</span><span style=color:#c82728>self</span><span>.routes {
+</span><span>            </span><span style=color:#8959a8>if</span><span> route.method </span><span style=color:#3e999f>==</span><span> method </span><span style=color:#3e999f>&&</span><span> url.</span><span style=color:#4271ae>starts_with</span><span>(</span><span style=color:#3e999f>&</span><span>route.url) {
+</span><span>                </span><span style=color:#8959a8>let</span><span> curr_len </span><span style=color:#3e999f>= </span><span style=color:#4271ae>sublength</span><span>(</span><span style=color:#3e999f>&</span><span>route.url, url);
+</span><span>                </span><span style=color:#8959a8>if</span><span> curr_len </span><span style=color:#3e999f>></span><span> max_len {
+</span><span>                    founded </span><span style=color:#3e999f>= </span><span style=color:#c99e00>Some</span><span>(route);
+</span><span>                    max_len </span><span style=color:#3e999f>=</span><span> curr_len;
+</span><span>                }
+</span><span>            }
+</span><span>        }
+</span><span>
+</span><span>        founded
+</span><span>    }
+</span><span>
+</span><span>    </span><span style=color:#8e908c>// обработчик входящий соединений
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>handle_client</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#f07219>self</span><span>, </span><span style=color:#8959a8>mut </span><span style=color:#f07219>stream</span><span>: TcpStream) -> </span><span style=color:#c99e00>Result</span><span><(), FrameworkError> {
+</span><span>        </span><span style=color:#8e908c>// немного логгинга
+</span><span>        </span><span style=color:#8959a8>if let </span><span style=color:#c99e00>Ok</span><span>(addr) </span><span style=color:#3e999f>=</span><span> stream.</span><span style=color:#4271ae>peer_addr</span><span>() {
+</span><span>            println!(</span><span style=color:#839c00>">>> incoming connection from </span><span>{}</span><span style=color:#839c00>:</span><span>{}</span><span style=color:#839c00>"</span><span>, addr.</span><span style=color:#4271ae>ip</span><span>(), addr.</span><span style=color:#4271ae>port</span><span>());
+</span><span>        }
+</span><span>
+</span><span>        </span><span style=color:#8e908c>// у нас коннект будет жить 5 секунд
+</span><span>        </span><span style=color:#8959a8>let</span><span> connection_start </span><span style=color:#3e999f>= </span><span>SystemTime::now();
+</span><span>        stream.</span><span style=color:#4271ae>set_read_timeout</span><span>(</span><span style=color:#c99e00>Some</span><span>(Duration::from_secs(</span><span style=color:#f07219>5</span><span>)))</span><span style=color:#3e999f>?</span><span>;
+</span><span>        stream.</span><span style=color:#4271ae>set_write_timeout</span><span>(</span><span style=color:#c99e00>Some</span><span>(Duration::from_secs(</span><span style=color:#f07219>5</span><span>)))</span><span style=color:#3e999f>?</span><span>;
+</span><span>
+</span><span>        </span><span style=color:#8959a8>loop </span><span>{
+</span><span>            </span><span style=color:#8e908c>// прошло больше 5 секунд?
+</span><span>            </span><span style=color:#8959a8>let</span><span> elapsed </span><span style=color:#3e999f>=</span><span> connection_start.</span><span style=color:#4271ae>elapsed</span><span>().</span><span style=color:#4271ae>unwrap_or</span><span>(Duration::from_secs(</span><span style=color:#f07219>5</span><span>));
+</span><span>            </span><span style=color:#8959a8>if</span><span> elapsed </span><span style=color:#3e999f>>= </span><span>Duration::from_secs(</span><span style=color:#f07219>5</span><span>) {
+</span><span>                </span><span style=color:#8959a8>break</span><span>;
+</span><span>            }
+</span><span>
+</span><span>            </span><span style=color:#8e908c>// парсим запрос
+</span><span>            </span><span style=color:#8959a8>let mut</span><span> request </span><span style=color:#3e999f>= </span><span>Data::new();
+</span><span>            request.addr </span><span style=color:#3e999f>=</span><span> stream.</span><span style=color:#4271ae>peer_addr</span><span>().</span><span style=color:#4271ae>ok</span><span>();
+</span><span>            request.</span><span style=color:#4271ae>parse</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut</span><span> stream)</span><span style=color:#3e999f>?</span><span>;
+</span><span>
+</span><span>            </span><span style=color:#8e908c>// нам нужен флаг Keep-Alive, чтобы в конце решить стоит ли закрывать соединение?
+</span><span>            </span><span style=color:#8959a8>let</span><span> keep_alive </span><span style=color:#3e999f>=</span><span> request.headers.</span><span style=color:#4271ae>get</span><span>(</span><span style=color:#839c00>"connection"</span><span>).</span><span style=color:#4271ae>map</span><span>(|</span><span style=color:#f07219>t</span><span>| t </span><span style=color:#3e999f>== </span><span style=color:#839c00>"keep-alive"</span><span>).</span><span style=color:#4271ae>unwrap_or</span><span>(</span><span style=color:#f07219>false</span><span>);
+</span><span>
+</span><span>            </span><span style=color:#8e908c>// ещё немного логгинга
+</span><span>            println!(</span><span style=color:#839c00>">>> </span><span>{:?} {}</span><span style=color:#f07219>\n</span><span>{}</span><span style=color:#839c00>"</span><span>, request.method, request.url, request.</span><span style=color:#4271ae>render_headers</span><span>());
+</span><span>
+</span><span>            </span><span style=color:#8959a8>let mut</span><span> response </span><span style=color:#3e999f>= </span><span style=color:#c82728>self
+</span><span>                </span><span style=color:#8e908c>// ищем роут
+</span><span>                .</span><span style=color:#4271ae>route</span><span>(</span><span style=color:#3e999f>&</span><span>request.url, request.method)
+</span><span>                </span><span style=color:#8e908c>// и вызываем обработчик
+</span><span>                .</span><span style=color:#4271ae>map</span><span>(|</span><span style=color:#f07219>r</span><span>| (r.func)(request))
+</span><span>                </span><span style=color:#8e908c>// или ошибка
+</span><span>                .</span><span style=color:#4271ae>unwrap_or</span><span>(Data::from_status(StatusCode::NotFound));
+</span><span>
+</span><span>            </span><span style=color:#8e908c>// и далее формируем заголовок ответа
+</span><span>            response.</span><span style=color:#4271ae>add_header</span><span>(</span><span style=color:#839c00>"host"</span><span>, format!(</span><span style=color:#839c00>"</span><span>{}</span><span style=color:#839c00>:</span><span>{}</span><span style=color:#839c00>"</span><span>, </span><span style=color:#c82728>self</span><span>.host, </span><span style=color:#c82728>self</span><span>.port));
+</span><span>            response.</span><span style=color:#4271ae>add_header</span><span>(</span><span style=color:#839c00>"server"</span><span>, </span><span style=color:#839c00>"micro-http/0.1"</span><span>);
+</span><span>            </span><span style=color:#8959a8>if</span><span> keep_alive {
+</span><span>                response.</span><span style=color:#4271ae>add_header</span><span>(</span><span style=color:#839c00>"connection"</span><span>, </span><span style=color:#839c00>"keep-alive"</span><span>);
+</span><span>            }
+</span><span>
+</span><span>            println!(</span><span style=color:#839c00>"<<< HTTP/1.1 </span><span>{}</span><span style=color:#f07219>\n</span><span>{}</span><span style=color:#839c00>"</span><span>, response.status_code, response.</span><span style=color:#4271ae>render_headers</span><span>());
+</span><span>            write!(stream, </span><span style=color:#839c00>"HTTP/1.1 </span><span>{}</span><span style=color:#f07219>\r\n</span><span>{}</span><span style=color:#f07219>\r\n</span><span style=color:#839c00>"</span><span>, response.status_code, response.</span><span style=color:#4271ae>render_headers</span><span>())</span><span style=color:#3e999f>?</span><span>;
+</span><span>            </span><span style=color:#8e908c>// контент пишем, если нужно
+</span><span>            </span><span style=color:#8959a8>if let </span><span style=color:#c99e00>Some</span><span>(content) </span><span style=color:#3e999f>=</span><span> response.content {
+</span><span>                stream.</span><span style=color:#4271ae>write_all</span><span>(content.</span><span style=color:#4271ae>as_slice</span><span>())</span><span style=color:#3e999f>?</span><span>;
+</span><span>            }
+</span><span>
+</span><span>            </span><span style=color:#8e908c>// ну тут очевидно
+</span><span>            </span><span style=color:#8959a8>if </span><span style=color:#3e999f>!</span><span>keep_alive {
+</span><span>                </span><span style=color:#8959a8>break</span><span>;
+</span><span>            }
+</span><span>        }
+</span><span>
+</span><span>        println!(</span><span style=color:#839c00>"--- end of connection ---"</span><span>);
+</span><span>
+</span><span>        </span><span style=color:#c99e00>Ok</span><span>(())
+</span><span>    }
+</span><span>
+</span><span>    </span><span style=color:#8e908c>// тут бы ограничение на число потоков :)
+</span><span>    </span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>run</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#f07219>self</span><span>) -> </span><span style=color:#c99e00>Option</span><span><()> {
+</span><span>        </span><span style=color:#8959a8>let</span><span> addr </span><span style=color:#3e999f>= </span><span>format!(</span><span style=color:#839c00>"</span><span>{}</span><span style=color:#839c00>:</span><span>{}</span><span style=color:#839c00>"</span><span>, </span><span style=color:#c82728>self</span><span>.host, </span><span style=color:#c82728>self</span><span>.port);
+</span><span>
+</span><span>        </span><span style=color:#8959a8>let</span><span> listener </span><span style=color:#3e999f>= </span><span>TcpListener::bind(</span><span style=color:#3e999f>&</span><span>addr).</span><span style=color:#4271ae>ok</span><span>()</span><span style=color:#3e999f>?</span><span>;
+</span><span>        println!(</span><span style=color:#839c00>">>> run server @ </span><span>{addr}</span><span style=color:#839c00>"</span><span>);
+</span><span>
+</span><span>        </span><span style=color:#8959a8>for</span><span> stream </span><span style=color:#3e999f>in</span><span> listener.</span><span style=color:#4271ae>incoming</span><span>().</span><span style=color:#4271ae>flatten</span><span>() {
+</span><span>            </span><span style=color:#8e908c>// будем создавать на каждый коннект новый поток
+</span><span>            </span><span style=color:#8959a8>let</span><span> app_clone </span><span style=color:#3e999f>= </span><span style=color:#c82728>self</span><span>.</span><span style=color:#4271ae>clone</span><span>();
+</span><span>            thread::spawn(</span><span style=color:#8959a8>move </span><span style=color:#3e999f>|| </span><span>{
+</span><span>                </span><span style=color:#8959a8>if let </span><span style=color:#c99e00>Some</span><span>(err) </span><span style=color:#3e999f>=</span><span> app_clone.</span><span style=color:#4271ae>handle_client</span><span>(stream).</span><span style=color:#4271ae>err</span><span>() {
+</span><span>                    </span><span style=color:#8e908c>// если что-то мы не обработали, то увидим это в логе
+</span><span>                    println!(</span><span style=color:#839c00>"!!! thread was stopped: </span><span>{err}</span><span style=color:#839c00>"</span><span>);
+</span><span>                }
+</span><span>            });
+</span><span>        }
+</span><span>
+</span><span>        </span><span style=color:#c99e00>Some</span><span>(())
+</span><span>    }
+</span><span>}
+</span></code></pre><p>В идеале, в методе <code>run</code>, стоило бы реализовать work-stealing очередь, но для этого нужно использовать библиотеку <a href=https://crates.io/crates/crossbeam>crossbeam</a>, или писать свою реализацию очереди.<p>В данной статье обойдёмся текущей кривой реализацией многопоточности.<h3 id=src-json-rs>src/json.rs</h3><pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>use </span><span>std::collections::HashMap;
+</span><span>
+</span><span style=color:#8959a8>use crate</span><span>::http::Data;
+</span><span>
+</span><span style=color:#8e908c>// как это спасает от длинных определений
+</span><span style=color:#8959a8>pub type </span><span>SimpleJson </span><span style=color:#3e999f>= </span><span>HashMap<</span><span style=color:#c99e00>String</span><span>, </span><span style=color:#c99e00>String</span><span>>;
+</span><span>
+</span><span style=color:#8e908c>// easy сериализация json
+</span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>serialize</span><span>(</span><span style=color:#f07219>data</span><span>: SimpleJson) -> Data {
+</span><span>    </span><span style=color:#8e908c>// просто собери ключи и значения в формате
+</span><span>    </span><span style=color:#8e908c>//  "key": "value"
+</span><span>    </span><span style=color:#8e908c>// и заджойни их запятыми
+</span><span>    </span><span style=color:#8959a8>let mut</span><span> content </span><span style=color:#3e999f>=</span><span> data.</span><span style=color:#4271ae>into_iter</span><span>().</span><span style=color:#4271ae>map</span><span>(|(</span><span style=color:#f07219>k</span><span>, </span><span style=color:#f07219>v</span><span>)| format!(</span><span style=color:#839c00>"</span><span style=color:#f07219>\"</span><span>{k}</span><span style=color:#f07219>\"</span><span style=color:#839c00>:</span><span style=color:#f07219>\"</span><span>{v}</span><span style=color:#f07219>\"</span><span style=color:#839c00>"</span><span>)).collect::<</span><span style=color:#c99e00>Vec</span><span><</span><span style=color:#c99e00>String</span><span>>>().</span><span style=color:#4271ae>join</span><span>(</span><span style=color:#839c00>","</span><span>);
+</span><span>    </span><span style=color:#8e908c>// и приправь это скобочками )))
+</span><span>    content.</span><span style=color:#4271ae>insert</span><span>(</span><span style=color:#f07219>0</span><span>, </span><span style=color:#839c00>'{'</span><span>);
+</span><span>    content.</span><span style=color:#4271ae>push</span><span>(</span><span style=color:#839c00>'}'</span><span>);
+</span><span>
+</span><span>    Data::from_content(</span><span style=color:#839c00>"application/json"</span><span>, content)
+</span><span>}
+</span><span>
+</span><span style=color:#8e908c>// а вот десериализация - уже сложнее
+</span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>deserialize</span><span>(</span><span style=color:#f07219>data</span><span>: </span><span style=color:#3e999f>&</span><span>[</span><span style=color:#8959a8>u8</span><span>]) -> </span><span style=color:#c99e00>Option</span><span>&LTSimpleJson> {
+</span><span>    </span><span style=color:#8959a8>let mut</span><span> result </span><span style=color:#3e999f>= </span><span>SimpleJson::new();
+</span><span>
+</span><span>    </span><span style=color:#8e908c>// так как контент запроса у нас в байтах, то необходимо его сначала преобразовать в строку
+</span><span>    </span><span style=color:#8959a8>let</span><span> data </span><span style=color:#3e999f>= </span><span style=color:#c99e00>String</span><span>::from_utf8(data.</span><span style=color:#4271ae>to_vec</span><span>()).</span><span style=color:#4271ae>ok</span><span>()</span><span style=color:#3e999f>?</span><span>;
+</span><span>    </span><span style=color:#8e908c>// так как мы не поддерживаем вложенность, то можно поступить следующим образом
+</span><span>    </span><span style=color:#8e908c>// удаляем скобочки ((( и дальше режем строки по запятым
+</span><span>    </span><span style=color:#8959a8>for</span><span> item </span><span style=color:#3e999f>in</span><span> data.</span><span style=color:#4271ae>replace</span><span>([</span><span style=color:#839c00>'{'</span><span>, </span><span style=color:#839c00>'}'</span><span>], </span><span style=color:#839c00>" "</span><span>).</span><span style=color:#4271ae>split</span><span>(</span><span style=color:#839c00>','</span><span>) {
+</span><span>        </span><span style=color:#8e908c>// нужно только разделить ключ и значение
+</span><span>        </span><span style=color:#8959a8>let </span><span>(key, value) </span><span style=color:#3e999f>=</span><span> item.</span><span style=color:#4271ae>split_once</span><span>(</span><span style=color:#839c00>':'</span><span>)</span><span style=color:#3e999f>?</span><span>;
+</span><span>        </span><span style=color:#8e908c>// удалить всё лишнее
+</span><span>        </span><span style=color:#8959a8>let</span><span> key </span><span style=color:#3e999f>=</span><span> key.</span><span style=color:#4271ae>replace</span><span>(</span><span style=color:#839c00>'"'</span><span>, </span><span style=color:#839c00>" "</span><span>).</span><span style=color:#4271ae>trim</span><span>().</span><span style=color:#4271ae>to_string</span><span>();
+</span><span>        </span><span style=color:#8959a8>let</span><span> value </span><span style=color:#3e999f>=</span><span> value[</span><span style=color:#f07219>1</span><span style=color:#3e999f>..</span><span>].</span><span style=color:#4271ae>replace</span><span>(</span><span style=color:#839c00>'"'</span><span>, </span><span style=color:#839c00>" "</span><span>).</span><span style=color:#4271ae>trim</span><span>().</span><span style=color:#4271ae>to_string</span><span>();
+</span><span>        </span><span style=color:#8e908c>// и запихнуть в словарь
+</span><span>        result.</span><span style=color:#4271ae>insert</span><span>(key, value);
+</span><span>    }
+</span><span>
+</span><span>    </span><span style=color:#c99e00>Some</span><span>(result)
+</span><span>}
+</span></code></pre><h3 id=src-random-rs>src/random.rs</h3><pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>use </span><span>std::time::{Duration, SystemTime, UNIX_EPOCH};
+</span><span>
+</span><span>#[</span><span style=color:#c82728>derive</span><span>(Default, Clone, Copy)]
+</span><span style=color:#8959a8>pub struct </span><span>Random {
+</span><span>    </span><span style=color:#c82728>init</span><span>: </span><span style=color:#8959a8>u32</span><span>,
+</span><span>}
+</span><span>
+</span><span style=color:#8e908c>// в качестве ГПСЧ нам хватит простого xorshift
+</span><span style=color:#8959a8>impl </span><span>Random {
+</span><span>    </span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>new</span><span>() -> Random {
+</span><span>        </span><span style=color:#8e908c>// в качестве seed будем использовать текущее время
+</span><span>        </span><span style=color:#8959a8>let</span><span> since_epoch </span><span style=color:#3e999f>= </span><span>SystemTime::now().</span><span style=color:#4271ae>duration_since</span><span>(UNIX_EPOCH).</span><span style=color:#4271ae>unwrap_or</span><span>(Duration::from_secs(</span><span style=color:#f07219>42</span><span>));
+</span><span>        Random { init: since_epoch.</span><span style=color:#4271ae>as_secs</span><span>() </span><span style=color:#3e999f>as </span><span style=color:#8959a8>u32 </span><span>}
+</span><span>    }
+</span><span>
+</span><span>    </span><span style=color:#8e908c>// "магия" xorshift
+</span><span>    </span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>generate</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>) -> </span><span style=color:#8959a8>u32 </span><span>{
+</span><span>        </span><span style=color:#c82728>self</span><span>.init </span><span style=color:#3e999f>^= </span><span style=color:#c82728>self</span><span>.init </span><span style=color:#3e999f><< </span><span style=color:#f07219>13</span><span>;
+</span><span>        </span><span style=color:#c82728>self</span><span>.init </span><span style=color:#3e999f>^= </span><span style=color:#c82728>self</span><span>.init </span><span style=color:#3e999f>>> </span><span style=color:#f07219>17</span><span>;
+</span><span>        </span><span style=color:#c82728>self</span><span>.init </span><span style=color:#3e999f>^= </span><span style=color:#c82728>self</span><span>.init </span><span style=color:#3e999f><< </span><span style=color:#f07219>5</span><span>;
+</span><span>        </span><span style=color:#c82728>self</span><span>.init
+</span><span>    }
+</span><span>
+</span><span>    </span><span style=color:#8e908c>// генерация псевдослучайного числа в диапазоне
+</span><span>    </span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>in_range</span><span>(</span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut </span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>min</span><span>: </span><span style=color:#8959a8>i32</span><span>, </span><span style=color:#f07219>max</span><span>: </span><span style=color:#8959a8>i32</span><span>) -> </span><span style=color:#8959a8>i32 </span><span>{
+</span><span>        </span><span style=color:#8959a8>let</span><span> value </span><span style=color:#3e999f>= </span><span style=color:#c82728>self</span><span>.</span><span style=color:#4271ae>generate</span><span>() </span><span style=color:#3e999f>% </span><span>(max </span><span style=color:#3e999f>-</span><span> min).</span><span style=color:#4271ae>unsigned_abs</span><span>();
+</span><span>        value </span><span style=color:#3e999f>as </span><span style=color:#8959a8>i32 </span><span style=color:#3e999f>+</span><span> min
+</span><span>    }
+</span><span>}
+</span></code></pre><h3 id=src-file-rs>src/file.rs</h3><pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>use </span><span>std::fs;
+</span><span>
+</span><span style=color:#8959a8>use crate</span><span>::http::Data;
+</span><span style=color:#8959a8>use crate</span><span>::status::StatusCode;
+</span><span>
+</span><span style=color:#8959a8>fn </span><span style=color:#4271ae>detect_content_type</span><span>(</span><span style=color:#f07219>filename</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>str</span><span>) -> String {
+</span><span>    </span><span style=color:#8e908c>// в идеале тут нужно определять mime-type файла по его содержимому, но нам хватит такого варианта
+</span><span>    </span><span style=color:#8959a8>match</span><span> filename.</span><span style=color:#4271ae>rsplit_once</span><span>(</span><span style=color:#839c00>'.'</span><span>) {
+</span><span>        </span><span style=color:#c99e00>Some</span><span>((</span><span style=color:#3e999f>_</span><span>, </span><span style=color:#839c00>"css"</span><span>)) </span><span style=color:#3e999f>=> </span><span style=color:#839c00>"text/css"</span><span>,
+</span><span>        </span><span style=color:#c99e00>Some</span><span>((</span><span style=color:#3e999f>_</span><span>, </span><span style=color:#839c00>"html"</span><span>)) </span><span style=color:#3e999f>=> </span><span style=color:#839c00>"text/html"</span><span>,
+</span><span>        </span><span style=color:#c99e00>Some</span><span>((</span><span style=color:#3e999f>_</span><span>, </span><span style=color:#839c00>"ico"</span><span>)) </span><span style=color:#3e999f>=> </span><span style=color:#839c00>"image/x-icon"</span><span>,
+</span><span>        </span><span style=color:#c99e00>Some</span><span>((</span><span style=color:#3e999f>_</span><span>, </span><span style=color:#839c00>"js"</span><span>)) </span><span style=color:#3e999f>=> </span><span style=color:#839c00>"text/javascript"</span><span>,
+</span><span>        </span><span style=color:#c99e00>Some</span><span>((</span><span style=color:#3e999f>_</span><span>, </span><span style=color:#839c00>"png"</span><span>)) </span><span style=color:#3e999f>=> </span><span style=color:#839c00>"image/x-png"</span><span>,
+</span><span>        </span><span style=color:#8e908c>// любые другие файлы будут считаться просто потоком байт
+</span><span>        </span><span style=color:#3e999f>_ => </span><span style=color:#839c00>"application/octet-stream"</span><span>,
+</span><span>    }
+</span><span>    .</span><span style=color:#4271ae>to_string</span><span>()
+</span><span>}
+</span><span>
+</span><span style=color:#8e908c>// формирование response из файла
+</span><span style=color:#8959a8>pub fn </span><span style=color:#4271ae>response</span><span>(</span><span style=color:#f07219>filename</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>str</span><span>) -> Data {
+</span><span>    </span><span style=color:#8959a8>match </span><span>fs::read(filename) {
+</span><span>        </span><span style=color:#c99e00>Ok</span><span>(content) </span><span style=color:#3e999f>=> </span><span>Data::from_content(</span><span style=color:#4271ae>detect_content_type</span><span>(filename), content),
+</span><span>        </span><span style=color:#c99e00>Err</span><span>(</span><span style=color:#3e999f>_</span><span>) </span><span style=color:#3e999f>=> </span><span>Data::from_status(StatusCode::NotFound),
+</span><span>    }
+</span><span>}
+</span><span>
+</span></code></pre><p>И вот теперь можно запускать и наслаждаться нашим небольшим http сервером!<p>Не забываем что он доступен на <a href=http://127.0.0.1:8000/>127.0.0.1:8000</a>.<h1 id=zakliuchenie>Заключение</h1><p>Тут должны быть какие-то выводы, но их не будет.<p>Всем пока!<h1 id=poleznye-ssylki>Полезные ссылки</h1><ul><li><a href=https://github.com/FreeCX/micro-http>MicroHttp</a><li><a href=https://medium.com/from-the-scratch/http-server-what-do-you-need-to-know-to-build-a-simple-http-server-from-scratch-d1ef8945e4fa>HTTP Server: Everything you need to know to Build a simple HTTP server from scratch</a><li>RFC <a href=https://www.rfc-editor.org/info/rfc7230>7230</a>, <a href=https://www.rfc-editor.org/info/rfc7231>7231</a>, <a href=https://www.rfc-editor.org/info/rfc7232>7232</a>, <a href=https://www.rfc-editor.org/info/rfc7233>7233</a>, <a href=https://www.rfc-editor.org/info/rfc7234>7234</a>, <a href=https://www.rfc-editor.org/info/rfc7235>7235</a><li><a href=https://crates.io/crates/crossbeam>crossbeam</a><li><a href=https://crates.io/crates/anyhow>anyhow</a> и <a href=https://crates.io/crates/thiserror>thiserror</a><li><a href=https://en.wikipedia.org/wiki/Xorshift>Xorshift</a><li><a href=https://www.jstatsoft.org/article/view/v008i14>Xorshift RNGs</a></ul></article><div class=back><a href=https://freecx.github.io/>Назад</a></div><div class=footer><span>Также читайте <a title="ты сам сломал ссылку, так что ничего личного" href=https://antoniii.github.io/> <s>antoniii</s> </a> <a href=https://citrux.github.io/>citrux</a> <a href=https://sputnikas.github.io/>sputnikas</a> </span></div><script>let msg=` А спонсор статей в моём блоге -- моя лень -- спонсор статей.`;[`=`.repeat(msg.length+ 1),msg,`=`.repeat(msg.length+ 1)].forEach(a=>console.warn(a))</script>

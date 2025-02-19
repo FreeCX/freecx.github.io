@@ -1,0 +1,412 @@
+<!doctype html><html lang=ru><head><meta charset=utf-8><meta content="IE=edge" http-equiv=X-UA-Compatible><meta content="width=device-width,initial-scale=1" name=viewport><title>LLVM фронтенд для Brainfuck</title><meta content="Кодерный понедельник" name=description><meta content=https://freecx.github.io/touch-icon.png property=og:image><link href=https://code.cdn.mozilla.net/fonts/fira.css rel=stylesheet><link href=https://freecx.github.io/favicon.png rel=icon><link href=https://freecx.github.io/touch-icon.png rel=apple-touch-icon><link href=https://freecx.github.io/main.css rel=stylesheet><link href=https://freecx.github.io/syntax.css rel=stylesheet><body><aside class=logo><a href=https://github.com/FreeCX> <img class=gravatar src=https://freecx.github.io/avatar.png> </a><span class=logo-prompt>Я на github</span></aside><article><div class=center><h1>LLVM фронтенд для Brainfuck</h1><time>11 April 2022</time></div><div class=divider></div><p>Всем привет!<p>А вот и вторая часть обещанной статьи.<p>Приступим же!<h1 id=vvedenie>Введение</h1><p>Для начала давайте определимся с терминологией.<p>Насчёт LLVM вики говорит нам следующее:<blockquote><p>LLVM — проект программной инфраструктуры для создания компиляторов и сопутствующих им утилит. Состоит из набора компиляторов из языков высокого уровня (так называемых «фронтендов»), системы оптимизации, интерпретации и компиляции в машинный код.</blockquote><p>В данном случае мы не будем сильно закапываться в архитектуру LLVM и ограничимся только его IR (или Intermediate Representation aka промежуточное представление).<p>Благо если у вас в системе установлен <a href=https://www.llvm.org>llvm</a>, то есть возможность использовать следующие утилиты:<ul><li><code>lli</code> — интерпретатор байткода<li><code>llc</code> — и компилятор соответственно</ul><p>Нам же будет достаточно только <code>lli</code>, но если захотите собрать приложение, то <code>llc</code> вам в помощь.<p>Но прежде чем мы перейдём написанию своего мини фронтенда давайте сделаем более простую вещь — напишем <a href=https://en.wikipedia.org/wiki/Source-to-source_compiler>транспайлер</a> в си.<h1 id=transpailer>Транспайлер</h1><p>Транспайлер или транслирующий компилятор довольно интересная вещь с точки зрения лени :)<p>Когда лень писать свой фронтенд, то мы всегда можем использовать мощности другого языка.<p>Просто реализуем перевод конструкций нашего языка в язык назначения (например <code>C</code>).<p>Большим плюсом мы можем получить возможности по оптимизации кода, но не всегда они могут быть успешными.<p>Хватит пустой болтовни... приступим к написанию кода.<p>Базироваться он будем на коде из <a href=https://freecx.github.io/blog/2021/12/29/bf-interp>прошлой статьи</a><pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>use </span><span>std::io::{</span><span style=color:#c82728>self</span><span>, Write};
+</span><span>
+</span><span style=color:#8959a8>use crate</span><span>::command::Command;
+</span><span style=color:#8959a8>use crate</span><span>::emulator::Emulator;
+</span><span>
+</span><span style=color:#8e908c>// определим трейт описывающий наш транспилятор
+</span><span style=color:#8959a8>pub trait </span><span>TranspilerC {
+</span><span>    </span><span style=color:#8e908c>// writer — туда будем писать результирующий код
+</span><span>    </span><span style=color:#8e908c>// и про обработку ошибок не забудем
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>into_code</span><span>&LTW: Write>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>writer</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut</span><span> W) -> </span><span style=color:#c99e00>Result</span><span><(), io::Error>;
+</span><span>}
+</span><span>
+</span><span style=color:#8e908c>// реализуем трейт для нашего эмулятора (o_0)
+</span><span style=color:#8959a8>impl </span><span>TranspilerC </span><span style=color:#8959a8>for </span><span>Emulator {
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>into_code</span><span>&LTW: Write>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>writer</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut</span><span> W) -> </span><span style=color:#c99e00>Result</span><span><(), io::Error> {
+</span><span>        </span><span style=color:#8e908c>// буфер с кодом
+</span><span>        </span><span style=color:#8959a8>let mut</span><span> code </span><span style=color:#3e999f>= </span><span style=color:#c99e00>String</span><span>::new();
+</span><span>
+</span><span>        </span><span style=color:#8e908c>// будем последовательно итерироваться по командам brainfuck
+</span><span>        </span><span style=color:#8e908c>// iter_command() — это по сути доступ к slice::Iter&LTCommand>
+</span><span>        </span><span style=color:#8959a8>for</span><span> token </span><span style=color:#3e999f>in </span><span style=color:#c82728>self</span><span>.</span><span style=color:#4271ae>iter_command</span><span>() {
+</span><span>            </span><span style=color:#8e908c>// для компактности я ужал код в однострочники, но в комментариях сделаю пояснения
+</span><span>            </span><span style=color:#8959a8>match</span><span> token {
+</span><span>                </span><span style=color:#8e908c>// проверяем условие на выход за границы памяти, и если всё ок то увеличиваем наш счётчик
+</span><span>                Command::Next </span><span style=color:#3e999f>=></span><span> code.</span><span style=color:#4271ae>push_str</span><span>(</span><span style=color:#839c00>"</span><span style=color:#f07219>\t</span><span style=color:#839c00>if (mp + 1 > MAX_MEM_SIZE) out_of_memory();</span><span style=color:#f07219>\n\t</span><span style=color:#839c00>mp += 1;</span><span style=color:#f07219>\n</span><span style=color:#839c00>"</span><span>),
+</span><span>                </span><span style=color:#8e908c>// так же проверям границы и уменьшаем счётчик
+</span><span>                Command::Previous </span><span style=color:#3e999f>=></span><span> code.</span><span style=color:#4271ae>push_str</span><span>(</span><span style=color:#839c00>"</span><span style=color:#f07219>\t</span><span style=color:#839c00>if (mp == 0) negative_memory();</span><span style=color:#f07219>\n\t</span><span style=color:#839c00>mp -= 1;</span><span style=color:#f07219>\n</span><span style=color:#839c00>"</span><span>),
+</span><span>                </span><span style=color:#8e908c>// увеличиваем значение ячейки памяти
+</span><span>                Command::Increment </span><span style=color:#3e999f>=></span><span> code.</span><span style=color:#4271ae>push_str</span><span>(</span><span style=color:#839c00>"</span><span style=color:#f07219>\t</span><span style=color:#839c00>mem[mp] += 1;</span><span style=color:#f07219>\n</span><span style=color:#839c00>"</span><span>),
+</span><span>                </span><span style=color:#8e908c>// аналогично, но с уменьшением
+</span><span>                Command::Decrement </span><span style=color:#3e999f>=></span><span> code.</span><span style=color:#4271ae>push_str</span><span>(</span><span style=color:#839c00>"</span><span style=color:#f07219>\t</span><span style=color:#839c00>mem[mp] -= 1;</span><span style=color:#f07219>\n</span><span style=color:#839c00>"</span><span>),
+</span><span>                </span><span style=color:#8e908c>// вывод символа из ячейки памяти
+</span><span>                Command::Put </span><span style=color:#3e999f>=></span><span> code.</span><span style=color:#4271ae>push_str</span><span>(</span><span style=color:#839c00>"</span><span style=color:#f07219>\t</span><span style=color:#839c00>putchar(mem[mp]);</span><span style=color:#f07219>\n</span><span style=color:#839c00>"</span><span>),
+</span><span>                </span><span style=color:#8e908c>// ввод символа с клавиатуры
+</span><span>                Command::Read </span><span style=color:#3e999f>=></span><span> code.</span><span style=color:#4271ae>push_str</span><span>(</span><span style=color:#839c00>"</span><span style=color:#f07219>\t</span><span style=color:#839c00>mem[mp] = getchar();</span><span style=color:#f07219>\n</span><span style=color:#839c00>"</span><span>),
+</span><span>                </span><span style=color:#8e908c>// начало цикла while
+</span><span>                Command::LoopBegin(</span><span style=color:#3e999f>_</span><span>) </span><span style=color:#3e999f>=></span><span> code.</span><span style=color:#4271ae>push_str</span><span>(</span><span style=color:#839c00>"</span><span style=color:#f07219>\t</span><span style=color:#839c00>while (mem[mp] != 0) {</span><span style=color:#f07219>\n</span><span style=color:#839c00>"</span><span>),
+</span><span>                </span><span style=color:#8e908c>// и условие завершение цикла
+</span><span>                Command::LoopEnd(</span><span style=color:#3e999f>_</span><span>) </span><span style=color:#3e999f>=></span><span> code.</span><span style=color:#4271ae>push_str</span><span>(</span><span style=color:#839c00>"</span><span style=color:#f07219>\t</span><span style=color:#839c00>if (mem[mp] == 0) break;</span><span style=color:#f07219>\n\t</span><span style=color:#839c00>}</span><span style=color:#f07219>\n</span><span style=color:#839c00>"</span><span>),
+</span><span>            }
+</span><span>        }
+</span><span>
+</span><span>        </span><span style=color:#8e908c>// пишем весь код во writer
+</span><span>        write!(writer, include_str!(</span><span style=color:#839c00>"../templates/c-template.txt"</span><span>), mem_size </span><span style=color:#3e999f>= </span><span style=color:#c82728>self</span><span>.</span><span style=color:#4271ae>mem_size</span><span>(), code </span><span style=color:#3e999f>=</span><span> code)
+</span><span>    }
+</span><span>}
+</span></code></pre><p>Этого небольшого кода нам хватит чтобы преобразовать любую программу на <code>Brainfuck</code> в программу на <code>C</code>.<p>Внимательный читатель мог заметить <code>include_str!("../templates/c-template.txt")</code> — данный макрос сильно упрощает нам жизнь, когда нужно вставить большой кусок текста и не очень хочется захламлять код.<p>Содержимое файла <code>c-template.txt</code> — шаблонный код на языке <code>C</code> с возможностью подстановки нужных нам значений<pre class=language-c data-lang=c style=color:#111;background-color:#f9f9f9><code class=language-c data-lang=c><span style=color:#8959a8>#include </span><span style=color:#839c00>&LTstdio.h>
+</span><span style=color:#8959a8>#include </span><span style=color:#839c00>&LTstdint.h>
+</span><span style=color:#8959a8>#include </span><span style=color:#839c00>&LTstring.h>
+</span><span style=color:#8959a8>#include </span><span style=color:#839c00>&LTstdlib.h>
+</span><span>
+</span><span style=color:#8959a8>#define </span><span>MAX_MEM_SIZE {mem_size}
+</span><span>
+</span><span>{</span><span style=color:#3e999f>%</span><span> raw </span><span style=color:#3e999f>%</span><span>}
+</span><span style=color:#8959a8>void </span><span style=color:#4271ae>out_of_memory</span><span>() {{
+</span><span>{</span><span style=color:#3e999f>%</span><span> endraw </span><span style=color:#3e999f>%</span><span>}
+</span><span>    </span><span style=color:#4271ae>puts(</span><span style=color:#839c00>"error: out of memory!"</span><span style=color:#4271ae>)</span><span>;
+</span><span>    </span><span style=color:#4271ae>exit(</span><span style=color:#3e999f>-</span><span style=color:#f07219>1</span><span style=color:#4271ae>)</span><span>;
+</span><span>{</span><span style=color:#3e999f>%</span><span> raw </span><span style=color:#3e999f>%</span><span>}
+</span><span>}}
+</span><span>{</span><span style=color:#3e999f>%</span><span> endraw </span><span style=color:#3e999f>%</span><span>}
+</span><span>
+</span><span>{</span><span style=color:#3e999f>%</span><span> raw </span><span style=color:#3e999f>%</span><span>}
+</span><span style=color:#8959a8>void </span><span style=color:#4271ae>negative_memory</span><span>() {{
+</span><span>{</span><span style=color:#3e999f>%</span><span> endraw </span><span style=color:#3e999f>%</span><span>}
+</span><span>    </span><span style=color:#4271ae>puts(</span><span style=color:#839c00>"error: cannot access negative memory index!"</span><span style=color:#4271ae>)</span><span>;
+</span><span>    </span><span style=color:#4271ae>exit(</span><span style=color:#3e999f>-</span><span style=color:#f07219>1</span><span style=color:#4271ae>)</span><span>;
+</span><span>{</span><span style=color:#3e999f>%</span><span> raw </span><span style=color:#3e999f>%</span><span>}
+</span><span>}}
+</span><span>{</span><span style=color:#3e999f>%</span><span> endraw </span><span style=color:#3e999f>%</span><span>}
+</span><span>
+</span><span>{</span><span style=color:#3e999f>%</span><span> raw </span><span style=color:#3e999f>%</span><span>}
+</span><span style=color:#8959a8>int </span><span style=color:#4271ae>main</span><span>() {{
+</span><span>    </span><span style=color:#c99e00>uint8_t</span><span> mem[MAX_MEM_SIZE] </span><span style=color:#3e999f>= </span><span>{{</span><span style=color:#f07219>0</span><span>}};
+</span><span>{</span><span style=color:#3e999f>%</span><span> endraw </span><span style=color:#3e999f>%</span><span>}
+</span><span>    </span><span style=color:#c99e00>uint32_t</span><span> mp </span><span style=color:#3e999f>= </span><span style=color:#f07219>0</span><span>;
+</span><span>
+</span><span>{code}
+</span><span>    </span><span style=color:#8959a8>return </span><span style=color:#f07219>0</span><span>;
+</span><span>{</span><span style=color:#3e999f>%</span><span> raw </span><span style=color:#3e999f>%</span><span>}
+</span><span>}}
+</span><span>{</span><span style=color:#3e999f>%</span><span> endraw </span><span style=color:#3e999f>%</span><span>}
+</span></code></pre><p>Шаблон кода слишком простой чтобы его комментировать. Давайте сразу перейдём к результату транспиляции <a href=https://github.com/FreeCX/post-brainfuck/blob/676606dfc3ced7ac43ea0ca048e44b05a31b354a/examples/hello.bf>hello.bf</a> из <code>Brainfuck</code> в <code>C</code>:<pre class=language-c data-lang=c style=color:#111;background-color:#f9f9f9><code class=language-c data-lang=c><span style=color:#8e908c>// ... шаблон опушен ...
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span style=color:#8959a8>while </span><span>(mem[mp] </span><span style=color:#3e999f>!= </span><span style=color:#f07219>0</span><span>) {
+</span><span style=color:#8959a8>if </span><span>(mp </span><span style=color:#3e999f>+ </span><span style=color:#f07219>1 </span><span style=color:#3e999f>></span><span> MAX_MEM_SIZE) </span><span style=color:#c82728>out_of_memory</span><span style=color:#4271ae>()</span><span>;
+</span><span>mp </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span style=color:#8959a8>if </span><span>(mp </span><span style=color:#3e999f>+ </span><span style=color:#f07219>1 </span><span style=color:#3e999f>></span><span> MAX_MEM_SIZE) </span><span style=color:#c82728>out_of_memory</span><span style=color:#4271ae>()</span><span>;
+</span><span>mp </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span style=color:#8959a8>if </span><span>(mp </span><span style=color:#3e999f>+ </span><span style=color:#f07219>1 </span><span style=color:#3e999f>></span><span> MAX_MEM_SIZE) </span><span style=color:#c82728>out_of_memory</span><span style=color:#4271ae>()</span><span>;
+</span><span>mp </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span style=color:#8959a8>if </span><span>(mp </span><span style=color:#3e999f>+ </span><span style=color:#f07219>1 </span><span style=color:#3e999f>></span><span> MAX_MEM_SIZE) </span><span style=color:#c82728>out_of_memory</span><span style=color:#4271ae>()</span><span>;
+</span><span>mp </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span style=color:#8959a8>if </span><span>(mp </span><span style=color:#3e999f>== </span><span style=color:#f07219>0</span><span>) </span><span style=color:#c82728>negative_memory</span><span style=color:#4271ae>()</span><span>;
+</span><span>mp </span><span style=color:#3e999f>-= </span><span style=color:#f07219>1</span><span>;
+</span><span style=color:#8959a8>if </span><span>(mp </span><span style=color:#3e999f>== </span><span style=color:#f07219>0</span><span>) </span><span style=color:#c82728>negative_memory</span><span style=color:#4271ae>()</span><span>;
+</span><span>mp </span><span style=color:#3e999f>-= </span><span style=color:#f07219>1</span><span>;
+</span><span style=color:#8959a8>if </span><span>(mp </span><span style=color:#3e999f>== </span><span style=color:#f07219>0</span><span>) </span><span style=color:#c82728>negative_memory</span><span style=color:#4271ae>()</span><span>;
+</span><span>mp </span><span style=color:#3e999f>-= </span><span style=color:#f07219>1</span><span>;
+</span><span style=color:#8959a8>if </span><span>(mp </span><span style=color:#3e999f>== </span><span style=color:#f07219>0</span><span>) </span><span style=color:#c82728>negative_memory</span><span style=color:#4271ae>()</span><span>;
+</span><span>mp </span><span style=color:#3e999f>-= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>-= </span><span style=color:#f07219>1</span><span>;
+</span><span style=color:#8959a8>if </span><span>(mem[mp] </span><span style=color:#3e999f>== </span><span style=color:#f07219>0</span><span>) </span><span style=color:#8959a8>break</span><span>;
+</span><span>}
+</span><span style=color:#8959a8>if </span><span>(mp </span><span style=color:#3e999f>+ </span><span style=color:#f07219>1 </span><span style=color:#3e999f>></span><span> MAX_MEM_SIZE) </span><span style=color:#c82728>out_of_memory</span><span style=color:#4271ae>()</span><span>;
+</span><span>mp </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span style=color:#c82728>putchar</span><span style=color:#4271ae>(mem[mp])</span><span>;
+</span><span style=color:#8959a8>if </span><span>(mp </span><span style=color:#3e999f>+ </span><span style=color:#f07219>1 </span><span style=color:#3e999f>></span><span> MAX_MEM_SIZE) </span><span style=color:#c82728>out_of_memory</span><span style=color:#4271ae>()</span><span>;
+</span><span>mp </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span style=color:#c82728>putchar</span><span style=color:#4271ae>(mem[mp])</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span style=color:#c82728>putchar</span><span style=color:#4271ae>(mem[mp])</span><span>;
+</span><span style=color:#c82728>putchar</span><span style=color:#4271ae>(mem[mp])</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span style=color:#c82728>putchar</span><span style=color:#4271ae>(mem[mp])</span><span>;
+</span><span style=color:#8959a8>if </span><span>(mp </span><span style=color:#3e999f>+ </span><span style=color:#f07219>1 </span><span style=color:#3e999f>></span><span> MAX_MEM_SIZE) </span><span style=color:#c82728>out_of_memory</span><span style=color:#4271ae>()</span><span>;
+</span><span>mp </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span style=color:#c82728>putchar</span><span style=color:#4271ae>(mem[mp])</span><span>;
+</span><span style=color:#8959a8>if </span><span>(mp </span><span style=color:#3e999f>== </span><span style=color:#f07219>0</span><span>) </span><span style=color:#c82728>negative_memory</span><span style=color:#4271ae>()</span><span>;
+</span><span>mp </span><span style=color:#3e999f>-= </span><span style=color:#f07219>1</span><span>;
+</span><span style=color:#8959a8>if </span><span>(mp </span><span style=color:#3e999f>== </span><span style=color:#f07219>0</span><span>) </span><span style=color:#c82728>negative_memory</span><span style=color:#4271ae>()</span><span>;
+</span><span>mp </span><span style=color:#3e999f>-= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span style=color:#c82728>putchar</span><span style=color:#4271ae>(mem[mp])</span><span>;
+</span><span style=color:#8959a8>if </span><span>(mp </span><span style=color:#3e999f>+ </span><span style=color:#f07219>1 </span><span style=color:#3e999f>></span><span> MAX_MEM_SIZE) </span><span style=color:#c82728>out_of_memory</span><span style=color:#4271ae>()</span><span>;
+</span><span>mp </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span style=color:#c82728>putchar</span><span style=color:#4271ae>(mem[mp])</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span style=color:#c82728>putchar</span><span style=color:#4271ae>(mem[mp])</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>-= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>-= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>-= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>-= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>-= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>-= </span><span style=color:#f07219>1</span><span>;
+</span><span style=color:#c82728>putchar</span><span style=color:#4271ae>(mem[mp])</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>-= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>-= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>-= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>-= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>-= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>-= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>-= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>-= </span><span style=color:#f07219>1</span><span>;
+</span><span style=color:#c82728>putchar</span><span style=color:#4271ae>(mem[mp])</span><span>;
+</span><span style=color:#8959a8>if </span><span>(mp </span><span style=color:#3e999f>+ </span><span style=color:#f07219>1 </span><span style=color:#3e999f>></span><span> MAX_MEM_SIZE) </span><span style=color:#c82728>out_of_memory</span><span style=color:#4271ae>()</span><span>;
+</span><span>mp </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span>mem[mp] </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span style=color:#c82728>putchar</span><span style=color:#4271ae>(mem[mp])</span><span>;
+</span><span style=color:#8959a8>if </span><span>(mp </span><span style=color:#3e999f>+ </span><span style=color:#f07219>1 </span><span style=color:#3e999f>></span><span> MAX_MEM_SIZE) </span><span style=color:#c82728>out_of_memory</span><span style=color:#4271ae>()</span><span>;
+</span><span>mp </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1</span><span>;
+</span><span style=color:#c82728>putchar</span><span style=color:#4271ae>(mem[mp])</span><span>;
+</span><span style=color:#8e908c>// ...
+</span></code></pre><p>Код конечно не самого лучшего качества, да и форматирование хромает, но зато это рабочая программа полученная из кода на <code>Brainfuck</code>, которая после запуска честно выводит на терминал<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>Hello</span><span style=color:#4271ae> World!
+</span></code></pre><p>Здесь конечно ещё можно произвести всякие улучшения, как например объединение одинаковых инструкций идущих подряд, но мы на этом остановимся и перейдём к следующему этапу.<h1 id=llvm-ir>LLVM IR</h1><p>Здесь так же будем использовать такой же шаблон как и в прошлом разделе, но тут стоит немного более подробно рассмотреть как каждая инструкция на <code>Brainfuck</code> преобразуется в <code>LLVM IR</code>.<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8e908c>// я ничего умнее не придумал и просто написал ещё один трейт
+</span><span style=color:#8959a8>pub trait </span><span>TranspilerLLVM {
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>into_code</span><span>&LTW: Write>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>writer</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut</span><span> W) -> </span><span style=color:#c99e00>Result</span><span><(), io::Error>;
+</span><span>}
+</span></code></pre><p>IR в LLVM имеет довольно специфичные ограничения по сравнению с другими ассемблерами. Например нельзя увеличить значение ячейки памяти, не загрузив её в промежуточную переменную. Полные подробности можно найти <a href=https://llvm.org/docs/LangRef.html#instruction-reference>по ссылке</a>.<p>Начнём же с инкремента ячейки памяти:<pre class=language-asm data-lang=asm style=color:#111;background-color:#f9f9f9><code class=language-asm data-lang=asm><span style=color:#8e908c>; тут mp и mem те же переменные что и раньше (индекс и память)
+</span><span style=color:#8e908c>; загружаем 32-битное значение из указателя на mp в регистр 1
+</span><span style=color:#4271ae>%</span><span style=color:#f07219>1 </span><span style=color:#4271ae>= load i32</span><span>, </span><span style=color:#4271ae>i32</span><span>* </span><span style=color:#4271ae>%mp
+</span><span style=color:#8e908c>; получаем адрес элемента mem по индексу из регистра 1
+</span><span style=color:#4271ae>%</span><span style=color:#f07219>2 </span><span style=color:#4271ae>= getelementptr i8</span><span>, </span><span style=color:#4271ae>i8</span><span>* </span><span style=color:#4271ae>%mem</span><span>, </span><span style=color:#4271ae>i32 %</span><span style=color:#f07219>1
+</span><span style=color:#8e908c>; загружаем байт значение по адресу из регистра 2
+</span><span style=color:#4271ae>%</span><span style=color:#f07219>3 </span><span style=color:#4271ae>= load i8</span><span>, </span><span style=color:#4271ae>i8</span><span>* </span><span style=color:#4271ae>%</span><span style=color:#f07219>2
+</span><span style=color:#8e908c>; увеличиваем данное значение на единицу и записываем в новый регистр
+</span><span style=color:#4271ae>%</span><span style=color:#f07219>4 </span><span style=color:#4271ae>= </span><span style=color:#8959a8>add </span><span style=color:#4271ae>i8 %</span><span style=color:#f07219>3</span><span>, </span><span style=color:#f07219>1
+</span><span style=color:#8e908c>; записывем значение обратно в ячейку памяти
+</span><span style=color:#4271ae>store i8 %</span><span style=color:#f07219>4</span><span>, </span><span style=color:#4271ae>i8</span><span>* </span><span style=color:#4271ae>%</span><span style=color:#f07219>2
+</span></code></pre><p>Тут стоит немного прояснить синтаксис.<p>Символ <code>%</code> перед значением указывает на локальную переменную.<p>Для каждой новой команды (если она возвращает значение) нужно увеличивать индекс регистра. Да и количество регистров не ограничено.<p>Хотя мы всегда можем использовать именованные регистры, чтобы не мучиться с всё время увеличивающимся счётчиком регистров.<p>Для реализации декремента всего-то нужно изменить<pre class=language-asm data-lang=asm style=color:#111;background-color:#f9f9f9><code class=language-asm data-lang=asm><span style=color:#4271ae>%</span><span style=color:#f07219>4 </span><span style=color:#4271ae>= </span><span style=color:#8959a8>add </span><span style=color:#4271ae>i8 %</span><span style=color:#f07219>3</span><span>, </span><span style=color:#f07219>1
+</span><span style=color:#8e908c>; на
+</span><span style=color:#4271ae>%</span><span style=color:#f07219>4 </span><span style=color:#4271ae>= </span><span style=color:#8959a8>sub </span><span style=color:#4271ae>i8 %</span><span style=color:#f07219>3</span><span>, </span><span style=color:#f07219>1
+</span></code></pre><p>Увеличение индекса <code>mp</code> реализуем вот так:<pre class=language-asm data-lang=asm style=color:#111;background-color:#f9f9f9><code class=language-asm data-lang=asm><span style=color:#8e908c>; загрузка значения
+</span><span style=color:#4271ae>    %v0 = load i32</span><span>, </span><span style=color:#4271ae>i32</span><span>* </span><span style=color:#4271ae>%mp
+</span><span style=color:#8e908c>; инкремент
+</span><span style=color:#4271ae>    %v1 = </span><span style=color:#8959a8>add </span><span style=color:#4271ae>i32 %v0</span><span>, </span><span style=color:#f07219>1
+</span><span style=color:#8e908c>; проверяем выходит ли за границу
+</span><span style=color:#4271ae>    %v2 = icmp sgt i32 %v1</span><span>, </span><span style=color:#f07219>30000
+</span><span style=color:#8e908c>; если выходит, то переходим к коду ошибки, а иначе идём дальше по коду
+</span><span style=color:#4271ae>    br i1 %v2</span><span>, </span><span style=color:#4271ae>label %OutOfMemory</span><span>, </span><span style=color:#4271ae>label %NextOk
+</span><span style=color:#4271ae>NextOk:
+</span><span style=color:#8e908c>; записываем в mp
+</span><span style=color:#4271ae>    store i32 %v1</span><span>, </span><span style=color:#4271ae>i32</span><span>* </span><span style=color:#4271ae>%mp
+</span></code></pre><p>Тут уже можно видеть, как вместо <code>%1</code> и т.д. используются именованные переменные, да и появились несколько новых команд.<p>Уменьшение индекса будет аналогичным, но только условие проверки сменится на<pre class=language-asm data-lang=asm style=color:#111;background-color:#f9f9f9><code class=language-asm data-lang=asm><span style=color:#4271ae>%v2 = icmp slt i32 %v1</span><span>, </span><span style=color:#f07219>0
+</span></code></pre><p>и переход к метке с выводом ошибки будет другим.<p>Теперь давайте рассмотрим команды вывода символа в терминал.<pre class=language-asm data-lang=asm style=color:#111;background-color:#f9f9f9><code class=language-asm data-lang=asm><span style=color:#8e908c>; нам нужно объявить используемую функцию
+</span><span style=color:#4271ae>declare i32 @putchar(i32)
+</span><span style=color:#8e908c>; @ указывает на глобальную переменную
+</span><span>
+</span><span style=color:#8e908c>; ...
+</span><span>
+</span><span style=color:#8e908c>; тут всё понятно
+</span><span style=color:#4271ae>%v0 = load i32</span><span>, </span><span style=color:#4271ae>i32</span><span>* </span><span style=color:#4271ae>%mp
+</span><span style=color:#4271ae>%v1 = getelementptr i8</span><span>, </span><span style=color:#4271ae>i8</span><span>* </span><span style=color:#4271ae>%mem</span><span>, </span><span style=color:#4271ae>i32 %v0
+</span><span style=color:#4271ae>%v2 = load i8</span><span>, </span><span style=color:#4271ae>i8</span><span>* </span><span style=color:#4271ae>%v1
+</span><span style=color:#8e908c>; знаковое расширение типа переменной с i8 до i32
+</span><span style=color:#4271ae>%v3 = sext i8 %v2 to i32
+</span><span style=color:#8e908c>; вызываем функцию
+</span><span style=color:#8959a8>call </span><span style=color:#4271ae>i32 @putchar(i32 %v3)
+</span></code></pre><p>А для чтения в память<pre class=language-asm data-lang=asm style=color:#111;background-color:#f9f9f9><code class=language-asm data-lang=asm><span style=color:#4271ae>declare i32 @getchar()
+</span><span>
+</span><span style=color:#8e908c>; ...
+</span><span>
+</span><span style=color:#4271ae>%v0 = load i32</span><span>, </span><span style=color:#4271ae>i32</span><span>* </span><span style=color:#4271ae>%mp
+</span><span style=color:#4271ae>%v1 = getelementptr i8</span><span>, </span><span style=color:#4271ae>i8</span><span>* </span><span style=color:#4271ae>%mem</span><span>, </span><span style=color:#4271ae>i32 %v0
+</span><span style=color:#8e908c>; читаем
+</span><span style=color:#4271ae>%v2 = </span><span style=color:#8959a8>call </span><span style=color:#4271ae>i32 @getchar()
+</span><span style=color:#8e908c>; усекаем i32 до i8
+</span><span style=color:#4271ae>%v3 = trunc i32 %v2 to i8
+</span><span style=color:#4271ae>store i8 %v3</span><span>, </span><span style=color:#4271ae>i8</span><span>* </span><span style=color:#4271ae>%v1
+</span></code></pre><p>Остаётся только разобраться с циклом и тут самое интересное. Пришлось схитрить, т.к. <code>lli</code> всё время не хотел нормально работать с метками. Всё оказалось из-за того, что нужно явно делать переходы на них с помощью <code>br</code><pre class=language-asm data-lang=asm style=color:#111;background-color:#f9f9f9><code class=language-asm data-lang=asm><span style=color:#4271ae>    br label %LoopStart
+</span><span style=color:#4271ae>LoopStart:
+</span><span style=color:#4271ae>    %v0 = load i32</span><span>, </span><span style=color:#4271ae>i32</span><span>* </span><span style=color:#4271ae>%mp
+</span><span style=color:#4271ae>    %v1 = getelementptr i8</span><span>, </span><span style=color:#4271ae>i8</span><span>* </span><span style=color:#4271ae>%mem</span><span>, </span><span style=color:#4271ae>i32 %v0
+</span><span style=color:#4271ae>    %v2 = load i8</span><span>, </span><span style=color:#4271ae>i8</span><span>* </span><span style=color:#4271ae>%v1
+</span><span style=color:#8e908c>; переход если равно 0
+</span><span style=color:#4271ae>    %v3 = icmp eq i8 %v2</span><span>, </span><span style=color:#f07219>0
+</span><span style=color:#4271ae>    br i1 %v3</span><span>, </span><span style=color:#4271ae>label %LoopEnd</span><span>, </span><span style=color:#4271ae>label %LoopNext
+</span><span style=color:#4271ae>LoopNext:
+</span><span style=color:#8e908c>; ... место для кода
+</span><span style=color:#4271ae>    %v4 = load i32</span><span>, </span><span style=color:#4271ae>i32</span><span>* </span><span style=color:#4271ae>%mp
+</span><span style=color:#4271ae>    %v5 = getelementptr i8</span><span>, </span><span style=color:#4271ae>i8</span><span>* </span><span style=color:#4271ae>%mem</span><span>, </span><span style=color:#4271ae>i32 %v4
+</span><span style=color:#4271ae>    %v6 = load i8</span><span>, </span><span style=color:#4271ae>i8</span><span>* </span><span style=color:#4271ae>%v5
+</span><span style=color:#8e908c>; переход если не равно 0
+</span><span style=color:#4271ae>    %v7 = icmp ne i8 %v5</span><span>, </span><span style=color:#f07219>0
+</span><span style=color:#4271ae>    br i1 %v7</span><span>, </span><span style=color:#4271ae>label %LoopStart</span><span>, </span><span style=color:#4271ae>label %LoopEnd
+</span><span style=color:#4271ae>LoopEnd:
+</span></code></pre><p>Тут пришлось объединить код двух команд для того чтобы было полное понимание переходов между ними.<p>Вроде бы разобрали все команды и можно приступить к написанию кода.<pre class=language-rust data-lang=rust style=color:#111;background-color:#f9f9f9><code class=language-rust data-lang=rust><span style=color:#8959a8>use </span><span>std::io::{</span><span style=color:#c82728>self</span><span>, Write};
+</span><span>
+</span><span style=color:#8959a8>use crate</span><span>::command::Command;
+</span><span style=color:#8959a8>use crate</span><span>::emulator::Emulator;
+</span><span>
+</span><span style=color:#8e908c>// ... transpilerLLVM trait ...
+</span><span>
+</span><span style=color:#8959a8>impl </span><span>TranspilerLLVM </span><span style=color:#8959a8>for </span><span>Emulator {
+</span><span>    </span><span style=color:#8959a8>fn </span><span style=color:#4271ae>into_code</span><span>&LTW: Write>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>writer</span><span>: </span><span style=color:#3e999f>&</span><span style=color:#8959a8>mut</span><span> W) -> </span><span style=color:#c99e00>Result</span><span><(), io::Error> {
+</span><span>        </span><span style=color:#8959a8>use </span><span>Command::</span><span style=color:#3e999f>*</span><span>;
+</span><span>
+</span><span>        </span><span style=color:#8e908c>// буфер для кода
+</span><span>        </span><span style=color:#8959a8>let mut</span><span> code </span><span style=color:#3e999f>= </span><span style=color:#c99e00>String</span><span>::new();
+</span><span>        </span><span style=color:#8e908c>// итерируемся по командам с индексами
+</span><span>        </span><span style=color:#8959a8>for </span><span>(index, cmd) </span><span style=color:#3e999f>in </span><span style=color:#c82728>self</span><span>.</span><span style=color:#4271ae>iter_command</span><span>().</span><span style=color:#4271ae>enumerate</span><span>() {
+</span><span>            </span><span style=color:#8e908c>// будем пушить шаблон кода с подстановкой своих значений
+</span><span>            </span><span style=color:#8959a8>match </span><span style=color:#3e999f>&</span><span>cmd {
+</span><span>                Next </span><span style=color:#3e999f>=> </span><span>{
+</span><span>                    code.</span><span style=color:#4271ae>push_str</span><span>(</span><span style=color:#3e999f>&</span><span>format!(
+</span><span>                        </span><span style=color:#8e908c>// сам шаблон
+</span><span>                        include_str!(</span><span style=color:#839c00>"../templates/llvm/next.txt"</span><span>),
+</span><span>                        </span><span style=color:#8e908c>// индекс инструкции нужен для именования временных переменных
+</span><span>                        index </span><span style=color:#3e999f>=</span><span> index,
+</span><span>                        </span><span style=color:#8e908c>// максимальное количество ячеек памяти
+</span><span>                        max_size </span><span style=color:#3e999f>= </span><span style=color:#c82728>self</span><span>.</span><span style=color:#4271ae>mem_size</span><span>()
+</span><span>                    ));
+</span><span>                }
+</span><span>                Previous </span><span style=color:#3e999f>=> </span><span>{
+</span><span>                    code.</span><span style=color:#4271ae>push_str</span><span>(</span><span style=color:#3e999f>&</span><span>format!(include_str!(</span><span style=color:#839c00>"../templates/llvm/prev.txt"</span><span>), index </span><span style=color:#3e999f>=</span><span> index));
+</span><span>                }
+</span><span>                Increment </span><span style=color:#3e999f>=> </span><span>{
+</span><span>                    code.</span><span style=color:#4271ae>push_str</span><span>(</span><span style=color:#3e999f>&</span><span>format!(
+</span><span>                        </span><span style=color:#8e908c>// унифицированный шаблон
+</span><span>                        include_str!(</span><span style=color:#839c00>"../templates/llvm/inc-dec.txt"</span><span>),
+</span><span>                        </span><span style=color:#8e908c>// где подставляется даже команда
+</span><span>                        cmd </span><span style=color:#3e999f>= </span><span style=color:#839c00>"add"</span><span>,
+</span><span>                        </span><span style=color:#8e908c>// и значение на которое изменяется
+</span><span>                        amount </span><span style=color:#3e999f>= </span><span style=color:#f07219>1</span><span>,
+</span><span>                        index </span><span style=color:#3e999f>=</span><span> index
+</span><span>                    ));
+</span><span>                }
+</span><span>                Decrement </span><span style=color:#3e999f>=> </span><span>{
+</span><span>                    code.</span><span style=color:#4271ae>push_str</span><span>(</span><span style=color:#3e999f>&</span><span>format!(
+</span><span>                        include_str!(</span><span style=color:#839c00>"../templates/llvm/inc-dec.txt"</span><span>),
+</span><span>                        cmd </span><span style=color:#3e999f>= </span><span style=color:#839c00>"sub"</span><span>,
+</span><span>                        amount </span><span style=color:#3e999f>= </span><span style=color:#f07219>1</span><span>,
+</span><span>                        index </span><span style=color:#3e999f>=</span><span> index
+</span><span>                    ));
+</span><span>                }
+</span><span>                Put </span><span style=color:#3e999f>=></span><span> code.</span><span style=color:#4271ae>push_str</span><span>(</span><span style=color:#3e999f>&</span><span>format!(include_str!(</span><span style=color:#839c00>"../templates/llvm/put.txt"</span><span>), index </span><span style=color:#3e999f>=</span><span> index)),
+</span><span>                Read </span><span style=color:#3e999f>=></span><span> code.</span><span style=color:#4271ae>push_str</span><span>(</span><span style=color:#3e999f>&</span><span>format!(include_str!(</span><span style=color:#839c00>"../templates/llvm/read.txt"</span><span>), index </span><span style=color:#3e999f>=</span><span> index)),
+</span><span>                LoopBegin(end) </span><span style=color:#3e999f>=> </span><span>{
+</span><span>                    code.</span><span style=color:#4271ae>push_str</span><span>(</span><span style=color:#3e999f>&</span><span>format!(include_str!(</span><span style=color:#839c00>"../templates/llvm/loop-begin.txt"</span><span>), start </span><span style=color:#3e999f>=</span><span> index, end </span><span style=color:#3e999f>=</span><span> end))
+</span><span>                }
+</span><span>                LoopEnd(start) </span><span style=color:#3e999f>=> </span><span>{
+</span><span>                    code.</span><span style=color:#4271ae>push_str</span><span>(</span><span style=color:#3e999f>&</span><span>format!(include_str!(</span><span style=color:#839c00>"../templates/llvm/loop-end.txt"</span><span>), start </span><span style=color:#3e999f>=</span><span> start, end </span><span style=color:#3e999f>=</span><span> index));
+</span><span>                }
+</span><span>            }
+</span><span>        }
+</span><span>
+</span><span>        </span><span style=color:#8e908c>// пишем в файл сформированный шаблонный код
+</span><span>        write!(writer, include_str!(</span><span style=color:#839c00>"../templates/llvm/template.txt"</span><span>), mem_size </span><span style=color:#3e999f>= </span><span style=color:#c82728>self</span><span>.</span><span style=color:#4271ae>mem_size</span><span>(), code </span><span style=color:#3e999f>=</span><span> code)
+</span><span>    }
+</span><span>}
+</span></code></pre><p>Тут уже стоит рассмотреть подробнее шаблонный код программы<pre class=language-asm data-lang=asm style=color:#111;background-color:#f9f9f9><code class=language-asm data-lang=asm><span style=color:#8e908c>; комментарий с именем модуля
+</span><span style=color:#8e908c>; ModuleID = 'brainfuck app'
+</span><span>
+</span><span style=color:#8e908c>; константы ошибок
+</span><span style=color:#4271ae>@err1 = private unnamed_addr constant </span><span>[</span><span style=color:#f07219>21 </span><span style=color:#4271ae>x i8</span><span>] </span><span style=color:#4271ae>c</span><span style=color:#839c00>"error: out of memory\00"
+</span><span style=color:#4271ae>@err2 = private unnamed_addr constant </span><span>[</span><span style=color:#f07219>43 </span><span style=color:#4271ae>x i8</span><span>] </span><span style=color:#4271ae>c</span><span style=color:#839c00>"error: cannot access negative memory index\00"
+</span><span>
+</span><span style=color:#8e908c>; объявляем функции для выделения и освобождения памяти
+</span><span style=color:#4271ae>declare i8</span><span>* </span><span style=color:#4271ae>@calloc(i32</span><span>, </span><span style=color:#4271ae>i32)
+</span><span style=color:#4271ae>declare void @free(i8</span><span>*</span><span style=color:#4271ae>)
+</span><span>
+</span><span style=color:#8e908c>; функции IO
+</span><span style=color:#4271ae>declare i32 @getchar()
+</span><span style=color:#4271ae>declare i32 @putchar(i32)
+</span><span style=color:#4271ae>declare i32 @puts(i8</span><span>*</span><span style=color:#4271ae>)
+</span><span>
+</span><span style=color:#8e908c>; определяем main функцию
+</span><span style=color:#4271ae>{% raw %}
+</span><span style=color:#4271ae>define i32 @main() {{
+</span><span style=color:#4271ae>{% endraw %}
+</span><span style=color:#8e908c>    ; выделяем {mem_size} ячеек памяти
+</span><span style=color:#4271ae>    %mem = </span><span style=color:#8959a8>call </span><span style=color:#4271ae>i8</span><span>* </span><span style=color:#4271ae>@calloc(i32 {mem_size}</span><span>, </span><span style=color:#4271ae>i32 </span><span style=color:#f07219>1</span><span style=color:#4271ae>)
+</span><span style=color:#8e908c>    ; аллоцируем указатель на стеке для индекса
+</span><span style=color:#4271ae>    %mp = alloca i32
+</span><span style=color:#8e908c>    ; и инициализируем его нулём
+</span><span style=color:#4271ae>    store i32 </span><span style=color:#f07219>0</span><span>, </span><span style=color:#4271ae>i32</span><span>* </span><span style=color:#4271ae>%mp
+</span><span>
+</span><span style=color:#8e908c>    ; тут будет подставлен код
+</span><span style=color:#4271ae>{code}
+</span><span style=color:#8e908c>    ; переходим к освобождению памяти
+</span><span style=color:#4271ae>    br label %AppEnd
+</span><span>
+</span><span style=color:#4271ae>OutOfMemory:
+</span><span style=color:#8e908c>    ; вызовем функцию которая выведет текст ошибки на терминал
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>call </span><span style=color:#4271ae>i32 @puts(i8</span><span>* </span><span style=color:#4271ae>getelementptr inbounds (</span><span>[</span><span style=color:#f07219>21 </span><span style=color:#4271ae>x i8</span><span>], [</span><span style=color:#f07219>21 </span><span style=color:#4271ae>x i8</span><span>]* </span><span style=color:#4271ae>@err1</span><span>, </span><span style=color:#4271ae>i64 </span><span style=color:#f07219>0</span><span>, </span><span style=color:#4271ae>i64 </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>    br label %AppEnd
+</span><span style=color:#4271ae>NegativeMemoryIndex:
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>call </span><span style=color:#4271ae>i32 @puts(i8</span><span>* </span><span style=color:#4271ae>getelementptr inbounds (</span><span>[</span><span style=color:#f07219>43 </span><span style=color:#4271ae>x i8</span><span>], [</span><span style=color:#f07219>43 </span><span style=color:#4271ae>x i8</span><span>]* </span><span style=color:#4271ae>@err2</span><span>, </span><span style=color:#4271ae>i64 </span><span style=color:#f07219>0</span><span>, </span><span style=color:#4271ae>i64 </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span style=color:#4271ae>    br label %AppEnd
+</span><span>
+</span><span style=color:#4271ae>AppEnd:
+</span><span style=color:#8e908c>    ; деаллоцируем память и завершим программу
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>call </span><span style=color:#4271ae>void @free(i8</span><span>* </span><span style=color:#4271ae>%mem)
+</span><span style=color:#4271ae>    </span><span style=color:#8959a8>ret </span><span style=color:#4271ae>i32 </span><span style=color:#f07219>0
+</span><span style=color:#4271ae>{% raw %}
+</span><span style=color:#4271ae>}}
+</span><span style=color:#4271ae>{% endraw %}
+</span></code></pre><p>Шаблоны для каждой инструкции можно посмотреть <a href=https://github.com/FreeCX/post-brainfuck/tree/676606dfc3ced7ac43ea0ca048e44b05a31b354a/templates/llvm>в папке</a>. Основное отличие от тех, что были описаны ранее — подстановка индексов для временных меток и регистров.<p>Теперь мы так же можешь преобразовать <a href=https://github.com/FreeCX/post-brainfuck/blob/676606dfc3ced7ac43ea0ca048e44b05a31b354a/examples/hello.bf>hello.bf</a> из <code>Brainfuck</code>, но уже в <code>LLVM IR</code>.<p>Покажу только часть кода, т.к. он получился намного длиннее кода на <code>C</code><pre class=language-asm data-lang=asm style=color:#111;background-color:#f9f9f9><code class=language-asm data-lang=asm><span style=color:#8e908c>; ...
+</span><span style=color:#4271ae>    store i8 %v38</span><span>, </span><span style=color:#4271ae>i8</span><span>* </span><span style=color:#4271ae>%v18
+</span><span style=color:#4271ae>    %v09 = load i32</span><span>, </span><span style=color:#4271ae>i32</span><span>* </span><span style=color:#4271ae>%mp
+</span><span style=color:#4271ae>    %v19 = getelementptr i8</span><span>, </span><span style=color:#4271ae>i8</span><span>* </span><span style=color:#4271ae>%mem</span><span>, </span><span style=color:#4271ae>i32 %v09
+</span><span style=color:#4271ae>    %v29 = load i8</span><span>, </span><span style=color:#4271ae>i8</span><span>* </span><span style=color:#4271ae>%v19
+</span><span style=color:#4271ae>    %v39 = </span><span style=color:#8959a8>add </span><span style=color:#4271ae>i8 %v29</span><span>, </span><span style=color:#f07219>1
+</span><span style=color:#4271ae>    store i8 %v39</span><span>, </span><span style=color:#4271ae>i8</span><span>* </span><span style=color:#4271ae>%v19
+</span><span style=color:#4271ae>    br label %LoopStart10
+</span><span style=color:#4271ae>LoopStart10:
+</span><span style=color:#4271ae>    %v010 = load i32</span><span>, </span><span style=color:#4271ae>i32</span><span>* </span><span style=color:#4271ae>%mp
+</span><span style=color:#4271ae>    %v110 = getelementptr i8</span><span>, </span><span style=color:#4271ae>i8</span><span>* </span><span style=color:#4271ae>%mem</span><span>, </span><span style=color:#4271ae>i32 %v010
+</span><span style=color:#4271ae>    %v210 = load i8</span><span>, </span><span style=color:#4271ae>i8</span><span>* </span><span style=color:#4271ae>%v110
+</span><span style=color:#8e908c>; ...
+</span></code></pre><p>Теперь этот код можно запустить с помощью <code>lli</code>:<pre class=language-bash data-lang=bash style=color:#111;background-color:#f9f9f9><code class=language-bash data-lang=bash><span style=color:#c82728>$</span><span style=color:#4271ae> lli hello.ll
+</span><span style=color:#c82728>Hello</span><span style=color:#4271ae> World!
+</span></code></pre><h1 id=zakliuchenie>Заключение</h1><p>Весь код доступен <a href=https://github.com/FreeCX/post-brainfuck>в репозитории</a><p>А на сегодня это всё.<p>До следующего раза!<h1 id=chto-pochitat>Что почитать</h1><ol><li><a href=https://www.llvm.org>The LLVM Compiler Infrastructure</a><li><a href=https://en.wikipedia.org/wiki/Source-to-source_compiler>Транспайлер</a></ol></article><div class=back><a href=https://freecx.github.io/>Назад</a></div><div class=footer><span>Также читайте <a title="ты сам сломал ссылку, так что ничего личного" href=https://antoniii.github.io/> <s>antoniii</s> </a> <a href=https://citrux.github.io/>citrux</a> <a href=https://sputnikas.github.io/>sputnikas</a> </span></div><script>let msg=` А спонсор статей в моём блоге -- моя лень -- спонсор статей.`;[`=`.repeat(msg.length+ 1),msg,`=`.repeat(msg.length+ 1)].forEach(a=>console.warn(a))</script>

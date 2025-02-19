@@ -1,0 +1,212 @@
+<!doctype html><html lang=ru><head><meta charset=utf-8><meta content="IE=edge" http-equiv=X-UA-Compatible><meta content="width=device-width,initial-scale=1" name=viewport><title>Кратко о L-системах</title><meta content="Кодерный понедельник" name=description><meta content=https://freecx.github.io/touch-icon.png property=og:image><link href=https://code.cdn.mozilla.net/fonts/fira.css rel=stylesheet><link href=https://freecx.github.io/favicon.png rel=icon><link href=https://freecx.github.io/touch-icon.png rel=apple-touch-icon><link href=https://freecx.github.io/main.css rel=stylesheet><link href=https://freecx.github.io/syntax.css rel=stylesheet><body><aside class=logo><a href=https://github.com/FreeCX> <img class=gravatar src=https://freecx.github.io/avatar.png> </a><span class=logo-prompt>Я на github</span></aside><article><div class=center><h1>Кратко о L-системах</h1><time>25 September 2020</time></div><div class=divider></div><p>Всем привет.<p>Долго откладывал написание этой статьи, но наконец нашёл в себе силы и дописал её!<p>Сегодня хотел бы показать интересную вещь как L-система или система Линденмайера.<p>Краткая справка из вики, для общего развития:<blockquote><p>L-система или система Линденмайера — это параллельная система переписывания и вид формальной грамматики. L-система состоит из алфавита символов, которые могут быть использованы для создания строк, набора порождающих правил, которые задают правила подстановки вместо каждого символа, начальной строки («аксиомы»), с которой начинается построение, и механизма перевода образованной строки в геометрические структуры.</blockquote><p>Чтобы заинтересовать давайте сразу глянем на результат того, что в итоге получиться: <video alt="sierpinski triangle" class="video media" style="max-width:640px;margin:0 auto;display:block" autoplay height=564 loop playsinline preload=auto tabindex=-1 width=660><source src=/posts/sierpinski_triangle.mp4 type=video/mp4></video><h1 id=zadacha>Задача</h1><p>Есть некоторая аксиома и N порождающих правил. Применяя каждое из правил к аксиоме мы получаем следующую итерацию значения системы. Для лучшего объяснения лучше почитайте <a href=https://en.wikipedia.org/wiki/L-system>вики</a> или <a href=http://inis.jinr.ru/sl/vol2/physics/%D0%94%D0%B8%D0%BD%D0%B0%D0%BC%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B8%D0%B5%20%D1%81%D0%B8%D1%81%D1%82%D0%B5%D0%BC%D1%8B%20%D0%B8%20%D0%A5%D0%B0%D0%BE%D1%81/%D0%9A%D1%80%D0%BE%D0%BD%D0%BE%D0%B2%D0%B5%D1%80%20%D0%A0.,%20%D0%A4%D1%80%D0%B0%D0%BA%D1%82%D0%B0%D0%BB%D1%8B%20%D0%B8%20%D1%85%D0%B0%D0%BE%D1%81%20%D0%B2%20%D0%B4%D0%B8%D0%BD%D0%B0%D0%BC%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B8%D1%85%20%D1%81%D0%B8%D1%81%D1%82%D0%B5%D0%BC%D0%B0%D1%85.%20%D0%9E%D1%81%D0%BD%D0%BE%D0%B2%D1%8B%20%D1%82%D0%B5%D0%BE%D1%80%D0%B8%D0%B8,%202000.pdf>книжку</a>.<p>Нам надо же произвести итерацию алгоритма и отрисовать текущее состояние системы, а потом повторить ещё N число раз.<p>Давайте рассмотрим на примере как происходит генерация для следующей системы:<pre style=color:#111;background-color:#f9f9f9><code><span>переменные: A B
+</span><span>аксиома: A
+</span><span>правила:
+</span><span>    A -> AB
+</span><span>    B -> A
+</span></code></pre><ol start=0><li>A<li>AB<li>ABA<li>ABAAB</ol><p>На нулевом шаге у нас по сути ничего нет и мы просто подставляем значение аксиомы.<p>На первом шаге преобразуем A в AB по правилу A.<p>На втором шаге А преобразуется в AB, а B преобразуется в A.<p>И на третьем шаге первая и последняя A в AB, а В, та что в середине в A. И в результате получаем ABAAB.<p>Надеюсь на данном этапе уже понятен смысл преобразований.<p>Остаётся только назначить каждому правилу некоторую команду. Допустим A -> x + 1, а B -> y + 1.<p>Обновим систему правил:<pre style=color:#111;background-color:#f9f9f9><code><span>переменные: A B
+</span><span>аксиома: A
+</span><span>правила:
+</span><span>    A -> AB
+</span><span>    B -> A
+</span><span>перемещение:
+</span><span>    A -> x + 1
+</span><span>    B -> y + 1
+</span></code></pre><p>Исполнив полученный результат по определенным командам мы получаем интересное поведение системы.<p>Для ABAAB, если принять начальное положение (x, y) за (0, 0) получаем: (3, 2).<ul><li>A: (1, 0)<li>B: (1, 1)<li>A: (2, 1)<li>A: (3, 1)<li>B: (3, 2)</ul><p>Вообще дополнительные правила можно придумать любые, но у нас будет в основном перемещение с отрисовкой.<h1 id=realizatsiia>Реализация</h1><p>Сразу представлю вспомогательный код с краткими комментариями, а потом перейдём к основному коду.<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>from </span><span>copy </span><span style=color:#8959a8>import </span><span>deepcopy
+</span><span style=color:#8959a8>from </span><span>pathlib </span><span style=color:#8959a8>import </span><span>Path
+</span><span style=color:#8959a8>import </span><span>subprocess </span><span style=color:#8959a8>as </span><span>sp
+</span><span style=color:#8959a8>import </span><span>argparse
+</span><span style=color:#8959a8>import </span><span>json
+</span><span style=color:#8959a8>import </span><span>math
+</span><span>
+</span><span style=color:#8959a8>from </span><span>PIL </span><span style=color:#8959a8>import </span><span>Image, ImageDraw
+</span><span>
+</span><span style=color:#8e908c># рендер через ffmpeg
+</span><span style=color:#8e908c># смотри статью: https://freecx.github.io/blog/2020/07/23/2.5d-effect
+</span><span style=color:#8959a8>class </span><span style=color:#c99e00>ffmpeg</span><span>:
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>__init__</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>fps</span><span>, </span><span style=color:#f07219>output</span><span>):
+</span><span>        </span><span style=color:#8e908c># команды ffmpeg
+</span><span>        </span><span style=color:#c82728>self</span><span>.cmd_out </span><span style=color:#3e999f>= </span><span>[
+</span><span>            </span><span style=color:#839c00>'ffmpeg'</span><span>, </span><span style=color:#839c00>'-i'</span><span>, </span><span style=color:#839c00>'-'</span><span>, </span><span style=color:#839c00>'-f'</span><span>, </span><span style=color:#839c00>'image2pipe'</span><span>, </span><span style=color:#839c00>'-r'</span><span>, </span><span style=color:#c99e00>str</span><span style=color:#4271ae>(fps)</span><span>, </span><span style=color:#839c00>'-c:v'</span><span>, </span><span style=color:#839c00>'libx264'</span><span>, </span><span style=color:#839c00>'-preset'</span><span>, </span><span style=color:#839c00>'slow'</span><span>,
+</span><span>            </span><span style=color:#839c00>'-profile:v'</span><span>, </span><span style=color:#839c00>'high'</span><span>, </span><span style=color:#839c00>'-crf'</span><span>, </span><span style=color:#839c00>'18'</span><span>, </span><span style=color:#839c00>'-coder'</span><span>, </span><span style=color:#839c00>'1'</span><span>, </span><span style=color:#839c00>'-pix_fmt'</span><span>, </span><span style=color:#839c00>'yuv420p'</span><span>, </span><span style=color:#839c00>'-vf'</span><span>, </span><span style=color:#839c00>'scale=iw:-2'</span><span>,
+</span><span>            </span><span style=color:#839c00>'-movflags'</span><span>, </span><span style=color:#839c00>'+faststart'</span><span>, </span><span style=color:#839c00>'-g'</span><span>, </span><span style=color:#839c00>'30'</span><span>, </span><span style=color:#839c00>'-bf'</span><span>, </span><span style=color:#839c00>'2'</span><span>, </span><span style=color:#839c00>'-y'</span><span>, </span><span style=color:#c99e00>str</span><span style=color:#4271ae>(output)</span><span>,
+</span><span>        ]
+</span><span>        </span><span style=color:#c82728>self</span><span>.pipe </span><span style=color:#3e999f>= </span><span style=color:#4271ae>sp.</span><span style=color:#c82728>Popen</span><span style=color:#4271ae>(</span><span style=color:#c82728>self</span><span style=color:#4271ae>.cmd_out, </span><span style=color:#f07219>stdin</span><span style=color:#3e999f>=</span><span style=color:#4271ae>sp.</span><span style=color:#c82728>PIPE</span><span style=color:#4271ae>)
+</span><span>
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>push</span><span>(</span><span style=color:#f07219>self</span><span>, </span><span style=color:#f07219>frame</span><span>):
+</span><span>        </span><span style=color:#8e908c># будем передавать PNGхи через pipe
+</span><span>        </span><span style=color:#4271ae>frame.</span><span style=color:#c82728>save</span><span style=color:#4271ae>(</span><span style=color:#c82728>self</span><span style=color:#4271ae>.pipe.stdin, </span><span style=color:#839c00>'PNG'</span><span style=color:#4271ae>)
+</span><span>
+</span><span>    </span><span style=color:#8959a8>def </span><span style=color:#4271ae>__del__</span><span>(</span><span style=color:#f07219>self</span><span>):
+</span><span>        </span><span style=color:#8e908c># корректно завершаем работу
+</span><span>        </span><span style=color:#c82728>self</span><span style=color:#4271ae>.pipe.stdin.</span><span style=color:#c82728>close</span><span style=color:#4271ae>()
+</span><span>        </span><span style=color:#c82728>self</span><span style=color:#4271ae>.pipe.</span><span style=color:#c82728>wait</span><span style=color:#4271ae>()
+</span><span>
+</span><span>        </span><span style=color:#8959a8>if </span><span style=color:#c82728>self</span><span>.pipe.returncode </span><span style=color:#3e999f>!= </span><span style=color:#f07219>0</span><span>:
+</span><span>            </span><span style=color:#8959a8>raise </span><span style=color:#4271ae>sp.</span><span style=color:#c82728>CalledProcessError</span><span style=color:#4271ae>(</span><span style=color:#c82728>self</span><span style=color:#4271ae>.pipe.returncode, </span><span style=color:#c82728>self</span><span style=color:#4271ae>.cmd_out)
+</span><span>
+</span><span style=color:#8e908c>#
+</span><span style=color:#8e908c># здесь будет код генерирующий кадры L-системы
+</span><span style=color:#8e908c>#
+</span><span>
+</span><span style=color:#8e908c># функция выполняющая модель из файла
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>execute_model</span><span>(</span><span style=color:#f07219>filename</span><span>, </span><span style=color:#3e999f>*</span><span>, </span><span style=color:#f07219>savename</span><span style=color:#3e999f>=</span><span style=color:#f07219>None</span><span>):
+</span><span>    </span><span style=color:#8959a8>with </span><span style=color:#4271ae>open(filename, </span><span style=color:#839c00>'r'</span><span style=color:#4271ae>) </span><span style=color:#8959a8>as </span><span>jsf:
+</span><span>        </span><span style=color:#8e908c># тут наша модель
+</span><span>        data </span><span style=color:#3e999f>= </span><span style=color:#4271ae>json.</span><span style=color:#c82728>load</span><span style=color:#4271ae>(jsf)
+</span><span>        </span><span style=color:#8e908c># генерируем финальный результат L-системы (прогон всех итераций)
+</span><span>        result </span><span style=color:#3e999f>= </span><span style=color:#c82728>generate</span><span style=color:#4271ae>(data[</span><span style=color:#839c00>'axiom'</span><span style=color:#4271ae>], data[</span><span style=color:#839c00>'iterations'</span><span style=color:#4271ae>], data[</span><span style=color:#839c00>'generate_rules'</span><span style=color:#4271ae>])
+</span><span>        </span><span style=color:#8e908c># определяем размер выходного видел делая пререндер модели
+</span><span>        state </span><span style=color:#3e999f>= </span><span style=color:#c82728>prerender</span><span style=color:#4271ae>(result, data[</span><span style=color:#839c00>'start_angle'</span><span style=color:#4271ae>], data[</span><span style=color:#839c00>'draw_rules'</span><span style=color:#4271ae>])
+</span><span>        </span><span style=color:#8e908c># рендерим видео каждого шага алгоритма
+</span><span>        </span><span style=color:#c82728>render</span><span style=color:#4271ae>(savename, state, result, data[</span><span style=color:#839c00>'start_angle'</span><span style=color:#4271ae>], data[</span><span style=color:#839c00>'draw_rules'</span><span style=color:#4271ae>])
+</span><span>
+</span><span>
+</span><span style=color:#8959a8>if </span><span>__name__ </span><span style=color:#3e999f>== </span><span style=color:#839c00>'__main__'</span><span>:
+</span><span>    </span><span style=color:#8e908c># парсинг аргументов командой строки
+</span><span>    parser </span><span style=color:#3e999f>= </span><span style=color:#4271ae>argparse.</span><span style=color:#c82728>ArgumentParser</span><span style=color:#4271ae>(</span><span style=color:#f07219>description</span><span style=color:#3e999f>=</span><span style=color:#839c00>'Draw L System model'</span><span style=color:#4271ae>)
+</span><span>    </span><span style=color:#4271ae>parser.</span><span style=color:#c82728>add_argument</span><span style=color:#4271ae>(</span><span style=color:#839c00>'-m'</span><span style=color:#4271ae>, </span><span style=color:#f07219>metavar</span><span style=color:#3e999f>=</span><span style=color:#839c00>'model'</span><span style=color:#4271ae>, </span><span style=color:#f07219>type</span><span style=color:#3e999f>=</span><span style=color:#c99e00>str</span><span style=color:#4271ae>, </span><span style=color:#f07219>default</span><span style=color:#3e999f>=</span><span style=color:#f07219>None</span><span style=color:#4271ae>, </span><span style=color:#f07219>help</span><span style=color:#3e999f>=</span><span style=color:#839c00>'input model file'</span><span style=color:#4271ae>)
+</span><span>    args </span><span style=color:#3e999f>= </span><span style=color:#4271ae>parser.</span><span style=color:#c82728>parse_args</span><span style=color:#4271ae>()
+</span><span>    </span><span style=color:#8959a8>if </span><span>args.m:
+</span><span>        </span><span style=color:#8e908c># имя файла выходного видео по имени используемой модели
+</span><span>        renamer </span><span style=color:#3e999f>= </span><span style=color:#8959a8>lambda </span><span style=color:#f07219>model</span><span>: </span><span style=color:#c99e00>str</span><span style=color:#4271ae>(model).</span><span style=color:#c82728>rsplit</span><span style=color:#4271ae>(</span><span style=color:#839c00>'.'</span><span style=color:#4271ae>, </span><span style=color:#f07219>1</span><span style=color:#4271ae>)</span><span>[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>+ </span><span style=color:#839c00>'.mp4'
+</span><span>        model </span><span style=color:#3e999f>= </span><span style=color:#c82728>Path</span><span style=color:#4271ae>(args.m)
+</span><span>        </span><span style=color:#8e908c># если в -m передали папку, то обрабатываем каждый из файлов
+</span><span>        </span><span style=color:#8959a8>if </span><span style=color:#4271ae>model.</span><span style=color:#c82728>is_dir</span><span style=color:#4271ae>()</span><span>:
+</span><span>            </span><span style=color:#8959a8>for </span><span>file </span><span style=color:#8959a8>in </span><span style=color:#4271ae>model.</span><span style=color:#c82728>iterdir</span><span style=color:#4271ae>()</span><span>:
+</span><span>                </span><span style=color:#4271ae>print(</span><span style=color:#8959a8>f</span><span style=color:#839c00>'> processing </span><span style=color:#4271ae>{file}</span><span style=color:#839c00>'</span><span style=color:#4271ae>)
+</span><span>                </span><span style=color:#8e908c># выполняем и рендерим модель
+</span><span>                </span><span style=color:#c82728>execute_model</span><span style=color:#4271ae>(file, </span><span style=color:#f07219>savename</span><span style=color:#3e999f>=</span><span style=color:#c82728>renamer</span><span style=color:#4271ae>(file))
+</span><span>        </span><span style=color:#8959a8>else</span><span>:
+</span><span>            </span><span style=color:#4271ae>print(</span><span style=color:#8959a8>f</span><span style=color:#839c00>'> processing </span><span style=color:#4271ae>{model}</span><span style=color:#839c00>'</span><span style=color:#4271ae>)
+</span><span>            </span><span style=color:#c82728>execute_model</span><span style=color:#4271ae>(model, </span><span style=color:#f07219>savename</span><span style=color:#3e999f>=</span><span style=color:#c82728>renamer</span><span style=color:#4271ae>(model))
+</span><span>    </span><span style=color:#8959a8>else</span><span>:
+</span><span>        </span><span style=color:#4271ae>parser.</span><span style=color:#c82728>print_help</span><span style=color:#4271ae>()
+</span></code></pre><p>Теперь перейдём к функциям рендеринга изображений<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8e908c># пререндер для определения размера холста
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>prerender</span><span>(</span><span style=color:#f07219>cmds</span><span>, </span><span style=color:#f07219>angle</span><span>, </span><span style=color:#f07219>rules</span><span>, </span><span style=color:#f07219>border</span><span style=color:#3e999f>=</span><span style=color:#f07219>10</span><span>):
+</span><span>    </span><span style=color:#8e908c># инициализируем границы холста нулями
+</span><span>    xmin, xmax, ymin, ymax, x, y </span><span style=color:#3e999f>= </span><span>[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>* </span><span style=color:#f07219>6
+</span><span>
+</span><span>    </span><span style=color:#8e908c># итерируемся по командам
+</span><span>    </span><span style=color:#8959a8>for </span><span>symbol </span><span style=color:#8959a8>in </span><span>cmds:
+</span><span>        </span><span style=color:#8e908c># выполняем текущее правило и получаем текущее положение курсора
+</span><span>        x, y, angle </span><span style=color:#3e999f>= </span><span style=color:#c82728>execute</span><span style=color:#4271ae>(x, y, angle, symbol, rules)
+</span><span>        </span><span style=color:#8e908c># обновляем границы холста
+</span><span>        xmin, xmax </span><span style=color:#3e999f>= </span><span style=color:#4271ae>min(x, xmin)</span><span>, </span><span style=color:#4271ae>max(x, xmax)
+</span><span>        ymin, ymax </span><span style=color:#3e999f>= </span><span style=color:#4271ae>min(y, ymin)</span><span>, </span><span style=color:#4271ae>max(y, ymax)
+</span><span>
+</span><span>    </span><span style=color:#8e908c># выводим размер картинки
+</span><span>    width </span><span style=color:#3e999f>= </span><span style=color:#4271ae>abs(xmin) </span><span style=color:#3e999f>+ </span><span style=color:#4271ae>abs(xmax)
+</span><span>    height </span><span style=color:#3e999f>= </span><span style=color:#4271ae>abs(ymin) </span><span style=color:#3e999f>+ </span><span style=color:#4271ae>abs(ymax)
+</span><span>    </span><span style=color:#8e908c># с окрушлением до чётных (нужно для mp4)
+</span><span>    </span><span style=color:#8959a8>if </span><span>width </span><span style=color:#3e999f>% </span><span style=color:#f07219>2 </span><span style=color:#3e999f>!= </span><span style=color:#f07219>0</span><span>:
+</span><span>        width </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1
+</span><span>    </span><span style=color:#8959a8>if </span><span>height </span><span style=color:#3e999f>% </span><span style=color:#f07219>2 </span><span style=color:#3e999f>!= </span><span style=color:#f07219>0</span><span>:
+</span><span>        height </span><span style=color:#3e999f>+= </span><span style=color:#f07219>1
+</span><span>    </span><span style=color:#8e908c># сдвиги по осям
+</span><span>    shift_x </span><span style=color:#3e999f>= </span><span style=color:#4271ae>abs(xmin)
+</span><span>    shift_y </span><span style=color:#3e999f>= </span><span style=color:#4271ae>abs(ymin)
+</span><span>    </span><span style=color:#8e908c># и возвращаем результирующие размеры холста с границами
+</span><span>    </span><span style=color:#8959a8>return </span><span>(width </span><span style=color:#3e999f>+ </span><span style=color:#f07219>2 </span><span style=color:#3e999f>* </span><span>border, height </span><span style=color:#3e999f>+ </span><span style=color:#f07219>2 </span><span style=color:#3e999f>* </span><span>border, shift_x </span><span style=color:#3e999f>+ </span><span>border, shift_y </span><span style=color:#3e999f>+ </span><span>border)
+</span><span>
+</span><span>
+</span><span style=color:#8e908c># функция отрисовки
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>render</span><span>(</span><span style=color:#f07219>output</span><span>, </span><span style=color:#f07219>state</span><span>, </span><span style=color:#f07219>cmds</span><span>, </span><span style=color:#f07219>angle</span><span>, </span><span style=color:#f07219>rules</span><span>):
+</span><span>    </span><span style=color:#8e908c># положения курсора
+</span><span>    px, py, lx, ly </span><span style=color:#3e999f>= </span><span>[</span><span style=color:#f07219>0</span><span>] </span><span style=color:#3e999f>* </span><span style=color:#f07219>4
+</span><span>    </span><span style=color:#8e908c># размеры холста + сдвиги
+</span><span>    w, h, sx, sy </span><span style=color:#3e999f>= </span><span>state
+</span><span>
+</span><span>    </span><span style=color:#8e908c># создаём наш холст
+</span><span>    img </span><span style=color:#3e999f>= </span><span style=color:#4271ae>Image.</span><span style=color:#c82728>new</span><span style=color:#4271ae>(</span><span style=color:#839c00>'RGB'</span><span style=color:#4271ae>, (w, h), </span><span style=color:#839c00>'white'</span><span style=color:#4271ae>)
+</span><span>    </span><span style=color:#8e908c># и получаем объект на котором можно рисовать
+</span><span>    drw </span><span style=color:#3e999f>= </span><span style=color:#4271ae>ImageDraw.</span><span style=color:#c82728>Draw</span><span style=color:#4271ae>(img)
+</span><span>    </span><span style=color:#8e908c># инициализируем pipe с ffmpeg
+</span><span>    render </span><span style=color:#3e999f>= </span><span style=color:#c82728>ffmpeg</span><span style=color:#4271ae>(</span><span style=color:#f07219>fps</span><span style=color:#3e999f>=</span><span style=color:#f07219>24</span><span style=color:#4271ae>, </span><span style=color:#f07219>output</span><span style=color:#3e999f>=</span><span style=color:#4271ae>output)
+</span><span>
+</span><span>    </span><span style=color:#8e908c># итерируемся по командам
+</span><span>    </span><span style=color:#8959a8>for </span><span>symbol </span><span style=color:#8959a8>in </span><span>cmds:
+</span><span>        </span><span style=color:#8e908c># выполняем текущее правило и получаем текущее положение курсора
+</span><span>        px, py, angle </span><span style=color:#3e999f>= </span><span style=color:#c82728>execute</span><span style=color:#4271ae>(px, py, angle, symbol, rules)
+</span><span>        </span><span style=color:#8e908c># рисуем линию от прошлошо положения к текужему
+</span><span>        </span><span style=color:#4271ae>drw.</span><span style=color:#c82728>line</span><span style=color:#4271ae>((lx </span><span style=color:#3e999f>+ </span><span style=color:#4271ae>sx, ly </span><span style=color:#3e999f>+ </span><span style=color:#4271ae>sy, px </span><span style=color:#3e999f>+ </span><span style=color:#4271ae>sx, py </span><span style=color:#3e999f>+ </span><span style=color:#4271ae>sy), </span><span style=color:#f07219>fill</span><span style=color:#3e999f>=</span><span style=color:#4271ae>(</span><span style=color:#f07219>0</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>, </span><span style=color:#f07219>0</span><span style=color:#4271ae>))
+</span><span>        </span><span style=color:#8e908c># обновляем прошлое положение не текущее
+</span><span>        lx, ly </span><span style=color:#3e999f>= </span><span>px, py
+</span><span>        </span><span style=color:#8e908c># и отдаём кадр ffmpeg
+</span><span>        </span><span style=color:#4271ae>render.</span><span style=color:#c82728>push</span><span style=color:#4271ae>(img)
+</span></code></pre><p>А теперь перейдём к самым интересным функциям:<pre class=language-python data-lang=python style=color:#111;background-color:#f9f9f9><code class=language-python data-lang=python><span style=color:#8959a8>def </span><span style=color:#4271ae>generate</span><span>(</span><span style=color:#f07219>init</span><span>, </span><span style=color:#f07219>iterations</span><span>, </span><span style=color:#f07219>rules</span><span>):
+</span><span>    </span><span style=color:#8e908c>"""основная функция генерирующая новое состояние системы
+</span><span style=color:#8e908c>
+</span><span style=color:#8e908c>    init - стартовая аксиома
+</span><span style=color:#8e908c>    itereations - количество итераций
+</span><span style=color:#8e908c>    rules - список правил
+</span><span style=color:#8e908c>    """
+</span><span>    </span><span style=color:#8959a8>for </span><span style=color:#c82728>_ </span><span style=color:#8959a8>in </span><span style=color:#4271ae>range(iterations)</span><span>:
+</span><span>        </span><span style=color:#8e908c># создаём пустой список
+</span><span>        res </span><span style=color:#3e999f>= </span><span>[]
+</span><span>        </span><span style=color:#8e908c># и заполняем его
+</span><span>        </span><span style=color:#8959a8>for </span><span>var </span><span style=color:#8959a8>in </span><span>init:
+</span><span>            </span><span style=color:#8e908c># выполняем текущее правило и кладём в список
+</span><span>            </span><span style=color:#4271ae>res.</span><span style=color:#c82728>append</span><span style=color:#4271ae>(rules[var] </span><span style=color:#8959a8>if </span><span style=color:#4271ae>rules.</span><span style=color:#c82728>get</span><span style=color:#4271ae>(var) </span><span style=color:#8959a8>else </span><span style=color:#4271ae>var)
+</span><span>        </span><span style=color:#8e908c># подменяем стартовую аксиому
+</span><span>        init </span><span style=color:#3e999f>= </span><span style=color:#839c00>''</span><span style=color:#4271ae>.</span><span style=color:#c82728>join</span><span style=color:#4271ae>(res)
+</span><span>    </span><span style=color:#8959a8>return </span><span>init
+</span><span>
+</span><span>
+</span><span style=color:#8959a8>def </span><span style=color:#4271ae>execute</span><span>(</span><span style=color:#f07219>x</span><span>, </span><span style=color:#f07219>y</span><span>, </span><span style=color:#f07219>angle</span><span>, </span><span style=color:#f07219>symbol</span><span>, </span><span style=color:#f07219>rules</span><span>):
+</span><span>    </span><span style=color:#8e908c>"""функция исполняющая правила отрисовки
+</span><span style=color:#8e908c>
+</span><span style=color:#8e908c>    x, y - положение курсора
+</span><span style=color:#8e908c>    angle - угол
+</span><span style=color:#8e908c>    symbol - текущая команда
+</span><span style=color:#8e908c>    rules - все правила системы
+</span><span style=color:#8e908c>    """
+</span><span>    </span><span style=color:#8e908c># существует ли символ в системе?
+</span><span>    </span><span style=color:#8959a8>if </span><span style=color:#4271ae>rules.</span><span style=color:#c82728>get</span><span style=color:#4271ae>(symbol)</span><span>:
+</span><span>        </span><span style=color:#8e908c># парсим наши команды
+</span><span>        </span><span style=color:#8959a8>if </span><span style=color:#839c00>':' </span><span style=color:#3e999f>in </span><span>rules[symbol]:
+</span><span>            </span><span style=color:#8e908c># на тип команды и значение
+</span><span>            cmd, var </span><span style=color:#3e999f>= </span><span>rules[symbol]</span><span style=color:#4271ae>.</span><span style=color:#c82728>split</span><span style=color:#4271ae>(</span><span style=color:#839c00>':'</span><span style=color:#4271ae>)
+</span><span>            cmd, var </span><span style=color:#3e999f>= </span><span style=color:#4271ae>cmd.</span><span style=color:#c82728>lower</span><span style=color:#4271ae>()</span><span>, </span><span style=color:#c99e00>float</span><span style=color:#4271ae>(var) </span><span style=color:#8959a8>if </span><span style=color:#4271ae>var.</span><span style=color:#c82728>isdigit</span><span style=color:#4271ae>() </span><span style=color:#8959a8>else </span><span style=color:#f07219>None
+</span><span>        </span><span style=color:#8959a8>else</span><span>:
+</span><span>            cmd </span><span style=color:#3e999f>= </span><span style=color:#4271ae>rules.</span><span style=color:#c82728>get</span><span style=color:#4271ae>(symbol)
+</span><span>            var </span><span style=color:#3e999f>= </span><span style=color:#f07219>None
+</span><span>
+</span><span>        </span><span style=color:#8e908c># команда продвижения вперёд
+</span><span>        </span><span style=color:#8959a8>if </span><span>cmd </span><span style=color:#3e999f>== </span><span style=color:#839c00>'forward'</span><span>:
+</span><span>            x </span><span style=color:#3e999f>+= </span><span style=color:#4271ae>round(var </span><span style=color:#3e999f>* </span><span style=color:#4271ae>math.</span><span style=color:#c82728>cos</span><span style=color:#4271ae>(math.</span><span style=color:#c82728>radians</span><span style=color:#4271ae>(angle)))
+</span><span>            y </span><span style=color:#3e999f>+= </span><span style=color:#4271ae>round(var </span><span style=color:#3e999f>* </span><span style=color:#4271ae>math.</span><span style=color:#c82728>sin</span><span style=color:#4271ae>(math.</span><span style=color:#c82728>radians</span><span style=color:#4271ae>(angle)))
+</span><span>        </span><span style=color:#8e908c># команда поворота налево
+</span><span>        </span><span style=color:#8959a8>elif </span><span>cmd </span><span style=color:#3e999f>== </span><span style=color:#839c00>'left'</span><span>:
+</span><span>            angle </span><span style=color:#3e999f>= </span><span>(angle </span><span style=color:#3e999f>+ </span><span>var) </span><span style=color:#3e999f>% </span><span style=color:#f07219>360
+</span><span>        </span><span style=color:#8e908c># команда поворота направо
+</span><span>        </span><span style=color:#8959a8>elif </span><span>cmd </span><span style=color:#3e999f>== </span><span style=color:#839c00>'right'</span><span>:
+</span><span>            angle </span><span style=color:#3e999f>= </span><span>(angle </span><span style=color:#3e999f>- </span><span>var) </span><span style=color:#3e999f>% </span><span style=color:#f07219>360
+</span><span>
+</span><span>    </span><span style=color:#8e908c># возвращаем новое состояние
+</span><span>    </span><span style=color:#8959a8>return </span><span>x, y, angle
+</span></code></pre><p>Вот и всё, всё готово!<h1 id=render>Рендер</h1><p>В начале статьи был представлен рендер Треугольника Серпинского, который можно записать в нотации L-системы следующим образом:<pre style=color:#111;background-color:#f9f9f9><code><span>переменные: F G
+</span><span>аксиома: F-G-G
+</span><span>правила:
+</span><span>    F -> F-G+F+G-F
+</span><span>    G -> GG
+</span><span>перемещение:
+</span><span>    F -> пройти вперёд на 20
+</span><span>    G -> пройти вперёд на 20
+</span><span>    + -> поворот налево на 120 градусов
+</span><span>    - -> поворот направо на 120 градусов
+</span></code></pre><p>Или сериализованный в json, для нашей программы:<pre class=language-json data-lang=json style=color:#111;background-color:#f9f9f9><code class=language-json data-lang=json><span>{
+</span><span>    </span><span style=color:#839c00>"axiom"</span><span>: </span><span style=color:#839c00>"F-G-G"</span><span>,
+</span><span>    </span><span style=color:#839c00>"generate_rules"</span><span>: {
+</span><span>        </span><span style=color:#839c00>"F"</span><span>: </span><span style=color:#839c00>"F-G+F+G-F"</span><span>,
+</span><span>        </span><span style=color:#839c00>"G"</span><span>: </span><span style=color:#839c00>"GG"
+</span><span>    },
+</span><span>    </span><span style=color:#839c00>"draw_rules"</span><span>: {
+</span><span>        </span><span style=color:#839c00>"F"</span><span>: </span><span style=color:#839c00>"forward:20"</span><span>,
+</span><span>        </span><span style=color:#839c00>"G"</span><span>: </span><span style=color:#839c00>"forward:20"</span><span>,
+</span><span>        </span><span style=color:#839c00>"+"</span><span>: </span><span style=color:#839c00>"left:120"</span><span>,
+</span><span>        </span><span style=color:#839c00>"-"</span><span>: </span><span style=color:#839c00>"right:120"
+</span><span>    },
+</span><span>    </span><span style=color:#839c00>"iterations"</span><span>: </span><span style=color:#f07219>5</span><span>,
+</span><span>    </span><span style=color:#839c00>"start_angle"</span><span>: </span><span style=color:#f07219>0
+</span><span>}
+</span></code></pre><p>Сохранив файл и скормив его программе получаем тот же результат, что и в начале статьи.<h1 id=zakliuchenie>Заключение</h1><p>Хотел бы выразить особую признательность и поблагодарить мою лень за то что успела выйти статья на <a href=https://en.wikipedia.org/wiki/L-system>хабре</a>, прежде чем я продолжил дописывать эту статью!<p>Исходники, и некоторые виды описанных систем, как всегда можно забрать по <a href=https://gist.github.com/FreeCX/1a25983bf0c0f22e7b16e15ef0da7ecd>ссылочке</a>. Модели запихнул в один файл, где ключ - имя файла, а значение - содержимое модели.<p>А на этом пока всё, всем пока!<h1 id=chto-pochitat>Что почитать</h1><ol><li>Кроновер Р., Фракталы и хаос в динамических системах. Основы теории, 2000<li><a href=https://en.wikipedia.org/wiki/L-system>L-systems</a><li><a href=https://habr.com/ru/company/piter/blog/496538/>Фракталы на Python. Пошаговое руководство</a></ol></article><div class=back><a href=https://freecx.github.io/>Назад</a></div><div class=footer><span>Также читайте <a title="ты сам сломал ссылку, так что ничего личного" href=https://antoniii.github.io/> <s>antoniii</s> </a> <a href=https://citrux.github.io/>citrux</a> <a href=https://sputnikas.github.io/>sputnikas</a> </span></div><script>let msg=` А спонсор статей в моём блоге -- моя лень -- спонсор статей.`;[`=`.repeat(msg.length+ 1),msg,`=`.repeat(msg.length+ 1)].forEach(a=>console.warn(a))</script>
